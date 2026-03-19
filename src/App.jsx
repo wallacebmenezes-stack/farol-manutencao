@@ -972,7 +972,7 @@ export default function App() {
       {!isMobile && (
         <div style={S.sidebar}>
           <div style={{ padding:"0 14px 16px", borderBottom:`1px solid ${C.border}`, marginBottom:8 }}>
-            <div style={{ fontSize:14, fontWeight:800, color:C.accent }}>⚙ FAROL</div>
+            <div style={{ fontSize:14, fontWeight:800, color:C.accent }}>⚙ CABANA DO SOL</div>
             <div style={{ fontSize:9, color:C.muted, marginTop:1, letterSpacing:"0.1em" }}>MANUTENÇÃO</div>
             <div style={{ fontSize:8, color:C.green, marginTop:4, display:"flex", alignItems:"center", gap:4 }}>
               <div style={{ width:5, height:5, borderRadius:"50%", background:C.green }}/>banco conectado
