@@ -343,21 +343,6 @@ export default function App() {
     setUsuario(null);
   }
 
-  // Enquanto verifica sessão
-  if (authLoading) return (
-    <div style={{ fontFamily:"'JetBrains Mono',monospace", background:"#080c10", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", color:"#5a7080", fontSize:12 }}>
-      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet"/>
-      <div style={{ textAlign:"center" }}>
-        <div style={{ fontSize:14, fontWeight:800, color:"#f5a623", marginBottom:12 }}>⚙ FAROL</div>
-        <div>Verificando sessão...</div>
-      </div>
-    </div>
-  );
-
-  // Tela de login se não autenticado
-  if (!usuario) return <LoginScreen onLogin={setUsuario} />;
-
-  const infoUsuario = USUARIOS[usuario.email] || { nome: usuario.email, cargo: "Usuário" };
   // ── Estado de dados ──
   const [ordens,       setOrdens]       = useState([]);
   const [excluidas,    setExcluidas]    = useState([]);
@@ -802,6 +787,20 @@ export default function App() {
     if (aba==="ordens"&&kpiAtivo) return {total:"Todas as OS",andamento:"OS Em Andamento",concluidas:"OS Concluídas",alertas:"OS com Alerta"}[kpiAtivo];
     return {dashboard:"Dashboard",alertas:"Alertas",ordens:"Ordens de Serviço",setores:"Por Setor",custos:"Custos",excluidas:"OS Excluídas"}[aba]||"";
   };
+
+  const infoUsuario = USUARIOS[usuario?.email] || { nome: usuario?.email || "Usuário", cargo: "Usuário" };
+
+  // ── Early returns APÓS todos os hooks ──
+  if (authLoading) return (
+    <div style={{ fontFamily:"'JetBrains Mono',monospace", background:"#080c10", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", color:"#5a7080", fontSize:12 }}>
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet"/>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontSize:14, fontWeight:800, color:"#f5a623", marginBottom:12 }}>⚙ FAROL</div>
+        <div>Verificando sessão...</div>
+      </div>
+    </div>
+  );
+  if (!usuario) return <LoginScreen onLogin={setUsuario} />;
 
   // ─── TELA DE CARREGAMENTO ──────────────────────────────────────────────────
   if (loading) return (
