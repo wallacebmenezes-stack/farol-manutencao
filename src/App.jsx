@@ -14,9 +14,11 @@ const USUARIOS = {
 
 // ─── TELA DE LOGIN ────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
+  const [tela,     setTela]     = useState("login"); // "login" | "recuperar" | "enviado"
   const [email,    setEmail]    = useState("");
   const [senha,    setSenha]    = useState("");
   const [erro,     setErro]     = useState("");
+  const [msg,      setMsg]      = useState("");
   const [loading,  setLoading]  = useState(false);
   const [mostrarS, setMostrarS] = useState(false);
 
@@ -28,6 +30,19 @@ function LoginScreen({ onLogin }) {
     if (error) { setErro("E-mail ou senha incorretos."); return; }
     onLogin(data.user);
   }
+
+  async function recuperarSenha(e) {
+    e.preventDefault();
+    setErro(""); setLoading(true);
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
+    setLoading(false);
+    if (error) { setErro("Erro ao enviar e-mail. Verifique o endereço."); return; }
+    setTela("enviado");
+  }
+
+  const inp = { width:"100%", background:"#131920", border:"1px solid #1e2830", borderRadius:6, padding:"9px 12px", color:"#dde6ee", fontSize:12, fontFamily:"inherit", boxSizing:"border-box", outline:"none" };
 
   return (
     <div style={{ fontFamily:"'JetBrains Mono','Fira Code',monospace", background:"#080c10", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -41,50 +56,73 @@ function LoginScreen({ onLogin }) {
           <div style={{ fontSize:10, color:"#5a7080", letterSpacing:"0.2em", marginTop:2 }}>SISTEMA DE MANUTENÇÃO</div>
         </div>
 
-        <form onSubmit={entrar}>
-          {/* Email */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ fontSize:9, color:"#5a7080", letterSpacing:"0.12em", textTransform:"uppercase", display:"block", marginBottom:5 }}>E-mail</label>
-            <input
-              type="email" value={email} onChange={e=>setEmail(e.target.value)} required
-              placeholder="seu@email.com"
-              style={{ width:"100%", background:"#131920", border:"1px solid #1e2830", borderRadius:6, padding:"9px 12px", color:"#dde6ee", fontSize:12, fontFamily:"inherit", boxSizing:"border-box", outline:"none" }}
-              onFocus={e=>e.target.style.borderColor="#f5a623"}
-              onBlur={e=>e.target.style.borderColor="#1e2830"}
-            />
-          </div>
-
-          {/* Senha */}
-          <div style={{ marginBottom:20 }}>
-            <label style={{ fontSize:9, color:"#5a7080", letterSpacing:"0.12em", textTransform:"uppercase", display:"block", marginBottom:5 }}>Senha</label>
-            <div style={{ position:"relative" }}>
-              <input
-                type={mostrarS?"text":"password"} value={senha} onChange={e=>setSenha(e.target.value)} required
-                placeholder="••••••••"
-                style={{ width:"100%", background:"#131920", border:"1px solid #1e2830", borderRadius:6, padding:"9px 38px 9px 12px", color:"#dde6ee", fontSize:12, fontFamily:"inherit", boxSizing:"border-box", outline:"none" }}
-                onFocus={e=>e.target.style.borderColor="#f5a623"}
-                onBlur={e=>e.target.style.borderColor="#1e2830"}
-              />
-              <span onClick={()=>setMostrarS(!mostrarS)}
-                style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", cursor:"pointer", fontSize:14, color:"#5a7080", userSelect:"none" }}>
-                {mostrarS ? "🙈" : "👁"}
+        {/* ── TELA LOGIN ── */}
+        {tela === "login" && (
+          <form onSubmit={entrar}>
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:9, color:"#5a7080", letterSpacing:"0.12em", textTransform:"uppercase", display:"block", marginBottom:5 }}>E-mail</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="seu@email.com" style={inp}
+                onFocus={e=>e.target.style.borderColor="#f5a623"} onBlur={e=>e.target.style.borderColor="#1e2830"}/>
+            </div>
+            <div style={{ marginBottom:8 }}>
+              <label style={{ fontSize:9, color:"#5a7080", letterSpacing:"0.12em", textTransform:"uppercase", display:"block", marginBottom:5 }}>Senha</label>
+              <div style={{ position:"relative" }}>
+                <input type={mostrarS?"text":"password"} value={senha} onChange={e=>setSenha(e.target.value)} required placeholder="••••••••"
+                  style={{ ...inp, padding:"9px 38px 9px 12px" }}
+                  onFocus={e=>e.target.style.borderColor="#f5a623"} onBlur={e=>e.target.style.borderColor="#1e2830"}/>
+                <span onClick={()=>setMostrarS(!mostrarS)} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", cursor:"pointer", fontSize:14, color:"#5a7080", userSelect:"none" }}>
+                  {mostrarS?"🙈":"👁"}
+                </span>
+              </div>
+            </div>
+            <div style={{ textAlign:"right", marginBottom:18 }}>
+              <span onClick={()=>{ setTela("recuperar"); setErro(""); }} style={{ fontSize:9, color:"#5a7080", cursor:"pointer", textDecoration:"underline", letterSpacing:"0.05em" }}>
+                Esqueci minha senha
               </span>
             </div>
-          </div>
+            {erro && <div style={{ marginBottom:14, padding:"8px 12px", background:"#e74c3c18", border:"1px solid #e74c3c44", borderRadius:6, fontSize:10, color:"#e74c3c" }}>⚠ {erro}</div>}
+            <button type="submit" disabled={loading} style={{ width:"100%", background:loading?"#5a7080":"#f5a623", color:"#000", border:"none", borderRadius:7, padding:"11px", fontSize:11, fontWeight:800, cursor:loading?"not-allowed":"pointer", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+        )}
 
-          {/* Erro */}
-          {erro && (
-            <div style={{ marginBottom:14, padding:"8px 12px", background:"#e74c3c18", border:"1px solid #e74c3c44", borderRadius:6, fontSize:10, color:"#e74c3c" }}>
-              ⚠ {erro}
+        {/* ── TELA RECUPERAR SENHA ── */}
+        {tela === "recuperar" && (
+          <form onSubmit={recuperarSenha}>
+            <div style={{ fontSize:11, color:"#8aa0b0", marginBottom:18, lineHeight:1.6 }}>
+              Digite seu e-mail e enviaremos um link para redefinir sua senha.
             </div>
-          )}
+            <div style={{ marginBottom:18 }}>
+              <label style={{ fontSize:9, color:"#5a7080", letterSpacing:"0.12em", textTransform:"uppercase", display:"block", marginBottom:5 }}>E-mail</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="seu@email.com" style={inp}
+                onFocus={e=>e.target.style.borderColor="#f5a623"} onBlur={e=>e.target.style.borderColor="#1e2830"}/>
+            </div>
+            {erro && <div style={{ marginBottom:14, padding:"8px 12px", background:"#e74c3c18", border:"1px solid #e74c3c44", borderRadius:6, fontSize:10, color:"#e74c3c" }}>⚠ {erro}</div>}
+            <button type="submit" disabled={loading} style={{ width:"100%", background:loading?"#5a7080":"#f5a623", color:"#000", border:"none", borderRadius:7, padding:"11px", fontSize:11, fontWeight:800, cursor:loading?"not-allowed":"pointer", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:10 }}>
+              {loading ? "Enviando..." : "Enviar link"}
+            </button>
+            <button type="button" onClick={()=>{ setTela("login"); setErro(""); }} style={{ width:"100%", background:"transparent", color:"#5a7080", border:"1px solid #1e2830", borderRadius:7, padding:"9px", fontSize:10, cursor:"pointer" }}>
+              ← Voltar ao login
+            </button>
+          </form>
+        )}
 
-          {/* Botão */}
-          <button type="submit" disabled={loading}
-            style={{ width:"100%", background: loading?"#5a7080":"#f5a623", color:"#000", border:"none", borderRadius:7, padding:"11px", fontSize:11, fontWeight:800, cursor: loading?"not-allowed":"pointer", letterSpacing:"0.1em", textTransform:"uppercase", transition:"all 0.15s" }}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+        {/* ── TELA ENVIADO ── */}
+        {tela === "enviado" && (
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:36, marginBottom:12 }}>📧</div>
+            <div style={{ fontSize:12, fontWeight:700, color:"#2ecc71", marginBottom:8 }}>E-mail enviado!</div>
+            <div style={{ fontSize:10, color:"#8aa0b0", lineHeight:1.7, marginBottom:24 }}>
+              Verifique a caixa de entrada de<br/>
+              <strong style={{ color:"#dde6ee" }}>{email}</strong><br/>
+              e clique no link para redefinir sua senha.
+            </div>
+            <button onClick={()=>{ setTela("login"); setErro(""); setEmail(""); }} style={{ width:"100%", background:"transparent", color:"#5a7080", border:"1px solid #1e2830", borderRadius:7, padding:"9px", fontSize:10, cursor:"pointer" }}>
+              ← Voltar ao login
+            </button>
+          </div>
+        )}
 
         <div style={{ marginTop:20, fontSize:9, color:"#5a7080", textAlign:"center", lineHeight:1.6 }}>
           Acesso restrito a usuários autorizados.<br/>
@@ -274,6 +312,31 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // ── Trocar senha ──
+  const [modalSenha,   setModalSenha]   = useState(false);
+  const [senhaAtual,   setSenhaAtual]   = useState("");
+  const [senhaNova,    setSenhaNova]    = useState("");
+  const [senhaConf,    setSenhaConf]    = useState("");
+  const [erroSenha,    setErroSenha]    = useState("");
+  const [salvandoSenha,setSalvandoS]   = useState(false);
+
+  async function trocarSenha(e) {
+    e.preventDefault();
+    setErroSenha("");
+    if (senhaNova.length < 6) { setErroSenha("A nova senha deve ter pelo menos 6 caracteres."); return; }
+    if (senhaNova !== senhaConf) { setErroSenha("As senhas não coincidem."); return; }
+    setSalvandoS(true);
+    // Reautentica com senha atual primeiro
+    const { error: reAuthErr } = await sb.auth.signInWithPassword({ email: usuario.email, password: senhaAtual });
+    if (reAuthErr) { setErroSenha("Senha atual incorreta."); setSalvandoS(false); return; }
+    const { error } = await sb.auth.updateUser({ password: senhaNova });
+    setSalvandoS(false);
+    if (error) { setErroSenha("Erro ao atualizar senha: " + error.message); return; }
+    setModalSenha(false);
+    setSenhaAtual(""); setSenhaNova(""); setSenhaConf("");
+    showToast("Senha alterada com sucesso!");
+  }
 
   async function sair() {
     await sb.auth.signOut();
@@ -756,6 +819,10 @@ export default function App() {
                 <div style={{ fontSize:10, fontWeight:700, color:C.text }}>{infoUsuario.nome}</div>
                 <div style={{ fontSize:9, color:C.muted }}>{infoUsuario.cargo}</div>
               </div>
+              <button onClick={()=>setModalSenha(true)} title="Alterar senha"
+                style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 8px", color:C.muted, fontSize:12, cursor:"pointer" }}>
+                🔑
+              </button>
               <button onClick={sair} title="Sair"
                 style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 10px", color:C.muted, fontSize:10, cursor:"pointer" }}>
                 Sair
@@ -1384,6 +1451,34 @@ export default function App() {
             ↩ DESFAZER
           </button>
           <span style={{ fontSize:10,color:C.muted,minWidth:20,textAlign:"center" }}>{undoSeg}s</span>
+        </div>
+      )}
+
+      {/* ══ MODAL TROCAR SENHA ══ */}
+      {modalSenha&&(
+        <div style={S.modal} onClick={()=>{setModalSenha(false);setErroSenha("");}}>
+          <div style={{...S.mbox,width:380}} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:12, fontWeight:800, color:C.accent, marginBottom:4 }}>🔑 Alterar senha</div>
+            <div style={{ fontSize:10, color:C.muted, marginBottom:18 }}>{usuario?.email}</div>
+            <form onSubmit={trocarSenha}>
+              {[
+                { label:"Senha atual",        val:senhaAtual, set:setSenhaAtual },
+                { label:"Nova senha",          val:senhaNova,  set:setSenhaNova  },
+                { label:"Confirmar nova senha",val:senhaConf,  set:setSenhaConf  },
+              ].map(({label,val,set})=>(
+                <div key={label} style={S.fr}>
+                  <label style={S.label}>{label}</label>
+                  <input type="password" style={S.inp} value={val} onChange={e=>set(e.target.value)} required placeholder="••••••••"/>
+                </div>
+              ))}
+              {erroSenha&&<div style={{ marginBottom:12, padding:"8px 12px", background:C.red+"18", border:`1px solid ${C.red}44`, borderRadius:6, fontSize:10, color:C.red }}>⚠ {erroSenha}</div>}
+              <div style={{ fontSize:9, color:C.muted, marginBottom:14 }}>Mínimo de 6 caracteres.</div>
+              <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+                <button type="button" style={S.btnGhost} onClick={()=>{setModalSenha(false);setErroSenha("");}}>Cancelar</button>
+                <button type="submit" style={S.btn()} disabled={salvandoSenha}>{salvandoSenha?"Salvando...":"Salvar nova senha"}</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
