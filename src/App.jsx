@@ -1,6 +1,14 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx";
+
+// XLSX carregado via CDN (evita problemas de compilação)
+const loadXLSX = () => new Promise((resolve) => {
+  if (window.XLSX) { resolve(window.XLSX); return; }
+  const s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  s.onload = () => resolve(window.XLSX);
+  document.head.appendChild(s);
+});
 
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL  = "https://teyxiznmkkmhqbufmuvp.supabase.co";
@@ -594,7 +602,8 @@ export default function App() {
   }
 
   // ─── EXPORTAR EXCEL ESTILIZADO ───────────────────────────────────────────────
-  function exportarExcel() {
+  async function exportarExcel() {
+    const XLSX = await loadXLSX();
     const agora = new Date().toLocaleDateString("pt-BR").replace(/\//g,"-");
     const wb = XLSX.utils.book_new();
 
