@@ -379,13 +379,6 @@ export default function App() {
     showToast("OS reativada!");
   }
 
-  async function excluirPermanente(id) {
-    const { error } = await sb.from("ordens").delete().eq("id", id);
-    if (error) { showToast("Erro ao excluir permanentemente","erro"); return; }
-    setExcluidas(prev => prev.filter(o => o.id !== id));
-    showToast("OS excluída permanentemente");
-  }
-
   // ─── ANEXOS ─────────────────────────────────────────────────────────────────
   async function lerArquivos(files, osId) {
     Array.from(files).forEach(file => {
@@ -1248,13 +1241,13 @@ export default function App() {
       )}
 
       {/* ══ TOAST UNDO CONCLUSÃO ══ */}
-      {undoInfo&&(
+      {undoId&&(
         <div style={{ position:"fixed",bottom:28,left:"50%",transform:"translateX(-50%)",background:"rgba(20,28,38,0.97)",border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.green}`,borderRadius:8,padding:"10px 16px",fontSize:11,color:C.text,backdropFilter:"blur(10px)",zIndex:300,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",display:"flex",alignItems:"center",gap:14,whiteSpace:"nowrap" }}>
           <span>✓ OS concluída</span>
           <button onClick={desfazerConclusao} style={{ background:C.yellow+"22",border:`1px solid ${C.yellow}55`,color:C.yellow,borderRadius:5,padding:"3px 10px",fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em" }}>
             ↩ DESFAZER
           </button>
-          <span style={{ fontSize:10,color:C.muted,minWidth:20,textAlign:"center" }}>{undoSegundos}s</span>
+          <span style={{ fontSize:10,color:C.muted,minWidth:20,textAlign:"center" }}>{undoSeg}s</span>
         </div>
       )}
     </div>
