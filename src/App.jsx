@@ -209,6 +209,10 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const showToast = (msg, tipo="ok") => { setToast({ msg, tipo }); setTimeout(()=>setToast(null), 3000); };
 
+  // ── Undo conclusão ──
+  const [undoInfo, setUndoInfo]     = useState(null); // { id, timer, segundos }
+  const [undoSegundos, setUndoSeg]  = useState(0);
+
   // ─── CARREGAR DADOS DO BANCO ────────────────────────────────────────────────
   const carregarTudo = useCallback(async () => {
     setLoading(true); setErro(null);
@@ -292,11 +296,33 @@ export default function App() {
 
   async function concluirOS(id) {
     const hoje_str = new Date().toISOString().split("T")[0];
-    const { error } = await sb.from("ordens").update({ status:"Concluido", data_conclusao: hoje_str }).eq("id",id);
+    const osAntes  = ordens.find(o => o.id === id);
+    const { error } = await sb.from("ordens").update({ status:"Concluido", data_conclusao: hoje_str }).eq("id", id);
     if (error) { showToast("Erro ao concluir OS","erro"); return; }
-    setOrdens(prev=>prev.map(o=>o.id===id?{...o,status:"Concluido",dataConclusao:hoje_str}:o));
-    setDetalhe(prev=>prev?{...prev,status:"Concluido",dataConclusao:hoje_str}:null);
-    showToast("OS concluída!");
+    setOrdens(prev => prev.map(o => o.id===id ? {...o, status:"Concluido", dataConclusao:hoje_str} : o));
+    setDetalhe(prev => prev ? {...prev, status:"Concluido", dataConclusao:hoje_str} : null);
+
+    // Inicia contagem regressiva de 30s para undo
+    let seg = 30;
+    setUndoSeg(seg);
+    setUndoInfo({ id, osAntes });
+    const intervalo = setInterval(() => {
+      seg--;
+      setUndoSeg(seg);
+      if (seg <= 0) { clearInterval(intervalo); setUndoInfo(null); setUndoSeg(0); }
+    }, 1000);
+    setUndoInfo({ id, osAntes, intervalo });
+  }
+
+  async function desfazerConclusao() {
+    if (!undoInfo) return;
+    clearInterval(undoInfo.intervalo);
+    const { id, osAntes } = undoInfo;
+    const { error } = await sb.from("ordens").update({ status:"Em Andamento", data_conclusao: null }).eq("id", id);
+    if (error) { showToast("Erro ao desfazer","erro"); return; }
+    setOrdens(prev => prev.map(o => o.id===id ? {...o, status:"Em Andamento", dataConclusao:null} : o));
+    setUndoInfo(null); setUndoSeg(0);
+    showToast("Conclusão desfeita!");
   }
 
   // ─── ANEXOS ─────────────────────────────────────────────────────────────────
@@ -1079,10 +1105,21 @@ export default function App() {
           onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow="0 4px 24px rgba(245,166,35,0.45)";}}>+</button>
       </div>
 
-      {/* ══ TOAST ══ */}
+      {/* ══ TOAST NORMAL ══ */}
       {toast&&(
         <div style={{ position:"fixed",bottom:28,left:"50%",transform:"translateX(-50%)",background:"rgba(20,28,38,0.97)",border:`1px solid ${C.border}`,borderLeft:`3px solid ${toast.tipo==="erro"?C.red:C.green}`,borderRadius:8,padding:"10px 18px",fontSize:11,color:C.text,backdropFilter:"blur(10px)",zIndex:300,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",whiteSpace:"nowrap" }}>
           {toast.tipo==="erro"?"⚠":"✓"} {toast.msg}
+        </div>
+      )}
+
+      {/* ══ TOAST UNDO CONCLUSÃO ══ */}
+      {undoInfo&&(
+        <div style={{ position:"fixed",bottom:28,left:"50%",transform:"translateX(-50%)",background:"rgba(20,28,38,0.97)",border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.green}`,borderRadius:8,padding:"10px 16px",fontSize:11,color:C.text,backdropFilter:"blur(10px)",zIndex:300,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",display:"flex",alignItems:"center",gap:14,whiteSpace:"nowrap" }}>
+          <span>✓ OS concluída</span>
+          <button onClick={desfazerConclusao} style={{ background:C.yellow+"22",border:`1px solid ${C.yellow}55`,color:C.yellow,borderRadius:5,padding:"3px 10px",fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em" }}>
+            ↩ DESFAZER
+          </button>
+          <span style={{ fontSize:10,color:C.muted,minWidth:20,textAlign:"center" }}>{undoSegundos}s</span>
         </div>
       )}
     </div>
