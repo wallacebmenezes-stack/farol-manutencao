@@ -494,6 +494,7 @@ export default function App() {
     return b;
   }, [ordensFiltradas, kpiAtivo, filtroStatus, filtroSetor, filtroPrio, busca, filialAtiva]);
 
+  
   const gastoMes = useMemo(()=>{ const m={}; ordensFiltradas.forEach(o=>{const k=o.dataInicio?.substring(0,7)||""; m[k]=(m[k]||0)+totalOS(o);}); return Object.entries(m).sort(); },[ordensFiltradas]);
   const maxMes   = Math.max(...gastoMes.map(([,v])=>v),1);
   const histSetor= useMemo(()=>{ const m={}; ordensFiltradas.forEach(o=>{if(!m[o.setor])m[o.setor]={qtd:0,gasto:0,abertos:0}; m[o.setor].qtd++; m[o.setor].gasto+=totalOS(o); if(o.status==="Em Andamento")m[o.setor].abertos++;}); return Object.entries(m).sort((a,b)=>b[1].gasto-a[1].gasto); },[ordensFiltradas]);
