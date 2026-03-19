@@ -493,8 +493,6 @@ export default function App() {
     if (busca) { const q=busca.toLowerCase(); b=b.filter(o=>[o.servico,o.solicitante,o.setor,...toArray(o.tecnicos)].some(x=>x.toLowerCase().includes(q))); }
     return b;
   }, [ordensFiltradas, kpiAtivo, filtroStatus, filtroSetor, filtroPrio, busca, filialAtiva]);
-    return b;
-  }, [ordens,kpiAtivo,filtroStatus,filtroSetor,filtroPrio,busca]);
 
   const gastoMes = useMemo(()=>{ const m={}; ordensFiltradas.forEach(o=>{const k=o.dataInicio?.substring(0,7)||""; m[k]=(m[k]||0)+totalOS(o);}); return Object.entries(m).sort(); },[ordensFiltradas]);
   const maxMes   = Math.max(...gastoMes.map(([,v])=>v),1);
