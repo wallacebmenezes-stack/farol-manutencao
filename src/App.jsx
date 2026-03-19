@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
@@ -214,8 +214,9 @@ export default function App() {
   const showToast = (msg, tipo="ok") => { setToast({ msg, tipo }); setTimeout(()=>setToast(null), 3000); };
 
   // ── Undo conclusão ──
-  const [undoInfo, setUndoInfo]     = useState(null); // { id, timer, segundos }
-  const [undoSegundos, setUndoSeg]  = useState(0);
+  const [undoId,      setUndoId]  = useState(null);
+  const [undoSeg,     setUndoSeg] = useState(0);
+  const undoRef = useRef(null);
 
   // ─── CARREGAR DADOS DO BANCO ────────────────────────────────────────────────
   const carregarTudo = useCallback(async () => {
@@ -308,27 +309,33 @@ export default function App() {
     setOrdens(prev => prev.map(o => o.id===id ? {...o, status:"Concluido", dataConclusao:hoje_str} : o));
     setDetalhe(prev => prev ? {...prev, status:"Concluido", dataConclusao:hoje_str} : null);
 
-    // Undo com contagem regressiva de 30s
-    if (undoInfo?.intervalo) clearInterval(undoInfo.intervalo);
-    let seg = 30;
-    setUndoSeg(seg);
-    const intervalo = setInterval(() => {
-      seg--;
-      setUndoSeg(s => s - 1);
-      if (seg <= 0) { clearInterval(intervalo); setUndoInfo(null); setUndoSeg(0); }
+    // Inicia undo com contagem regressiva
+    if (undoRef.current) clearInterval(undoRef.current);
+    setUndoId(id);
+    setUndoSeg(30);
+    undoRef.current = setInterval(() => {
+      setUndoSeg(s => {
+        if (s <= 1) { clearInterval(undoRef.current); undoRef.current=null; setUndoId(null); return 0; }
+        return s - 1;
+      });
     }, 1000);
-    setUndoInfo({ id, intervalo });
   }
 
   async function desfazerConclusao() {
-    if (!undoInfo) return;
-    clearInterval(undoInfo.intervalo);
-    const { id } = undoInfo;
-    const { error } = await sb.from("ordens").update({ status:"Em Andamento", data_conclusao: null }).eq("id", id);
+    if (!undoId) return;
+    if (undoRef.current) { clearInterval(undoRef.current); undoRef.current=null; }
+    const { error } = await sb.from("ordens").update({ status:"Em Andamento", data_conclusao: null }).eq("id", undoId);
     if (error) { showToast("Erro ao desfazer","erro"); return; }
-    setOrdens(prev => prev.map(o => o.id===id ? {...o, status:"Em Andamento", dataConclusao:null} : o));
-    setUndoInfo(null); setUndoSeg(0);
+    setOrdens(prev => prev.map(o => o.id===undoId ? {...o, status:"Em Andamento", dataConclusao:null} : o));
+    setUndoId(null); setUndoSeg(0);
     showToast("Conclusão desfeita!");
+  }
+
+  async function excluirPermanente(id) {
+    const { error } = await sb.from("ordens").delete().eq("id", id);
+    if (error) { showToast("Erro ao excluir permanentemente","erro"); return; }
+    setExcluidas(prev => prev.filter(o => o.id !== id));
+    showToast("OS excluída permanentemente");
   }
 
   // ── Seleção múltipla para exclusão ──
@@ -370,6 +377,13 @@ export default function App() {
     setExcluidas(prev => prev.filter(o => o.id !== id));
     setOrdens(prev => [{ ...os, excluido:false, excluidoEm:null, excluidoPor:null }, ...prev]);
     showToast("OS reativada!");
+  }
+
+  async function excluirPermanente(id) {
+    const { error } = await sb.from("ordens").delete().eq("id", id);
+    if (error) { showToast("Erro ao excluir permanentemente","erro"); return; }
+    setExcluidas(prev => prev.filter(o => o.id !== id));
+    showToast("OS excluída permanentemente");
   }
 
   // ─── ANEXOS ─────────────────────────────────────────────────────────────────
@@ -862,6 +876,7 @@ export default function App() {
                             <div style={{ display:"flex", gap:5 }}>
                               <button style={S.btn(C.green,"#000")} onClick={()=>reativarOS(o.id)}>↩ Reativar</button>
                               <button style={S.btn(C.blue,"#fff")} onClick={()=>{setEditOS({...o,tecnicos:toArray(o.tecnicos)});setModalOS(true);}}>✏ Editar</button>
+                              <button style={S.btn(C.red,"#fff")} onClick={()=>{ if(window.confirm(`Excluir permanentemente a OS #${String(o.id).padStart(3,"0")}? Esta ação não pode ser desfeita.`)) excluirPermanente(o.id); }}>🗑 Excluir</button>
                             </div>
                           </td>
                         </tr>
