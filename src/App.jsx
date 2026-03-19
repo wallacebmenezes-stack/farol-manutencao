@@ -484,6 +484,8 @@ export default function App() {
     if (filtroPrio  !=="Todos") b = b.filter(o=>o.prioridade===filtroPrio);
     if (busca) { const q=busca.toLowerCase(); b=b.filter(o=>[o.servico,o.solicitante,o.setor,...toArray(o.tecnicos)].some(x=>x.toLowerCase().includes(q))); }
     return b;
+  }, [ordensFiltradas, kpiAtivo, filtroStatus, filtroSetor, filtroPrio, busca, filialAtiva]);
+    return b;
   }, [ordens,kpiAtivo,filtroStatus,filtroSetor,filtroPrio,busca]);
 
   const gastoMes = useMemo(()=>{ const m={}; ordensFiltradas.forEach(o=>{const k=o.dataInicio?.substring(0,7)||""; m[k]=(m[k]||0)+totalOS(o);}); return Object.entries(m).sort(); },[ordensFiltradas]);
@@ -1056,10 +1058,10 @@ export default function App() {
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <button onClick={()=>setMenuAberto(true)} style={{ background:"transparent", border:"none", color:C.accent, fontSize:22, cursor:"pointer", padding:"2px 4px" }}>☰</button>
               {/* Filial tabs mobile */}
-              <div style={{ display:"flex", background:C.card, border:`1px solid ${C.border}`, borderRadius:6, overflow:"hidden" }}>
+              <div style={{ display:"flex", background:C.card, border:`1px solid ${C.border}`, borderRadius:8, overflow:"hidden" }}>
                 {["Geral","Farol","VIP"].map(f=>(
                   <button key={f} onClick={()=>setFilialAtiva(f)}
-                    style={{ background: filialAtiva===f ? C.accent : "transparent", color: filialAtiva===f ? "#000" : C.muted, border:"none", padding:"5px 10px", fontSize:10, fontWeight:700, cursor:"pointer" }}>
+                    style={{ background: filialAtiva===f ? C.accent : "transparent", color: filialAtiva===f ? "#000" : C.muted, border:"none", padding:"7px 14px", fontSize:12, fontWeight:800, cursor:"pointer", letterSpacing:"0.05em" }}>
                     {f}
                   </button>
                 ))}
@@ -1081,11 +1083,11 @@ export default function App() {
               {kpiAtivo&&aba==="ordens"&&<button style={{...S.btnGhost,padding:"3px 8px",fontSize:9}} onClick={()=>setKpiAtivo(null)}>✕ limpar filtro</button>}
             </div>
             <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-              {/* Seletor de filial */}
-              <div style={{ display:"flex", background:C.card, border:`1px solid ${C.border}`, borderRadius:7, overflow:"hidden" }}>
+              {/* Seletor de filial — destaque central */}
+              <div style={{ display:"flex", background:C.card, border:`1px solid ${C.border}`, borderRadius:10, overflow:"hidden", boxShadow:`0 2px 12px rgba(0,0,0,0.4)` }}>
                 {["Geral","Farol","VIP"].map(f=>(
                   <button key={f} onClick={()=>setFilialAtiva(f)}
-                    style={{ background: filialAtiva===f ? C.accent : "transparent", color: filialAtiva===f ? "#000" : C.muted, border:"none", padding:"5px 14px", fontSize:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.06em", transition:"all 0.15s" }}>
+                    style={{ background: filialAtiva===f ? C.accent : "transparent", color: filialAtiva===f ? "#000" : C.muted, border:"none", padding:"9px 24px", fontSize:13, fontWeight:800, cursor:"pointer", letterSpacing:"0.08em", transition:"all 0.15s", minWidth:80 }}>
                     {f}
                   </button>
                 ))}
@@ -1247,7 +1249,13 @@ export default function App() {
                         </div>
                       </div>
                       <div style={{ fontSize:13, fontWeight:600, marginBottom:4, lineHeight:1.3 }}>{o.servico}</div>
-                      <div style={{ fontSize:11, color:C.muted, marginBottom:6 }}>{o.setor} · {fmtData(o.dataInicio)}</div>
+                      <div style={{ fontSize:11, color:C.muted, marginBottom:6, display:"flex", alignItems:"center", gap:6 }}>
+                        <span>{o.setor !== "VIP" ? o.setor : "Salão VIP"}</span>
+                        <span style={{ color:C.muted }}>·</span>
+                        <span>{fmtData(o.dataInicio)}</span>
+                        {o.filial==="VIP" && <span style={{ background:C.purple+"22", color:C.purple, border:`1px solid ${C.purple}44`, borderRadius:4, padding:"1px 6px", fontSize:9, fontWeight:700 }}>VIP</span>}
+                        {o.filial==="Farol" && filialAtiva==="Geral" && <span style={{ background:C.blue+"22", color:C.blue, border:`1px solid ${C.blue}44`, borderRadius:4, padding:"1px 6px", fontSize:9, fontWeight:700 }}>FAROL</span>}
+                      </div>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                         <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
                           <Tag label={o.prioridade} color={PRIO_COLOR[o.prioridade]}/>
