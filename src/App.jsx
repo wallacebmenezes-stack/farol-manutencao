@@ -745,33 +745,48 @@ export default function App() {
     setTiposServico(prev=>prev.filter(t=>t.id!==id));
   }
 
+  // ─── MOBILE ───────────────────────────────────────────────────────────────
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [menuAberto, setMenuAberto] = useState(false);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
   // ─── ESTILOS ──────────────────────────────────────────────────────────────
   const S = {
-    app:      { fontFamily:"'JetBrains Mono','Fira Code',monospace", background:C.bg, minHeight:"100vh", color:C.text, display:"flex", fontSize:12 },
+    app:      { fontFamily:"'JetBrains Mono','Fira Code',monospace", background:C.bg, minHeight:"100vh", color:C.text, display:"flex", flexDirection: isMobile?"column":"row", fontSize:12 },
     sidebar:  { width:210, background:C.surf, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", padding:"18px 0", flexShrink:0, position:"sticky", top:0, height:"100vh", overflowY:"auto" },
+    // Mobile: sidebar vira drawer overlay
+    sidebarMobile: { position:"fixed", inset:0, zIndex:200, display:"flex" },
+    sidebarDrawer: { width:240, background:C.surf, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", padding:"18px 0", height:"100vh", overflowY:"auto" },
+    sidebarOverlay:{ flex:1, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(2px)" },
+    // Mobile topbar
+    topbarMobile: { background:C.surf, borderBottom:`1px solid ${C.border}`, padding:"10px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, zIndex:10 },
     navItem:  (a)=>({ display:"flex", alignItems:"center", gap:8, padding:"8px 12px", margin:"1px 6px", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:a?700:400, background:a?C.accentDim:"transparent", color:a?C.accent:C.muted, transition:"all 0.1s" }),
     navSub:   (a)=>({ display:"flex", alignItems:"center", gap:6, padding:"6px 10px 6px 28px", margin:"1px 6px", borderRadius:5, cursor:"pointer", fontSize:10, fontWeight:a?700:400, background:a?"#ffffff08":"transparent", color:a?C.text:C.muted }),
     navSec:   { fontSize:9, color:C.muted, letterSpacing:"0.14em", textTransform:"uppercase", padding:"12px 18px 4px", marginTop:6 },
-    main:     { flex:1, display:"flex", flexDirection:"column", minHeight:"100vh" },
+    main:     { flex:1, display:"flex", flexDirection:"column", minHeight: isMobile?"calc(100vh - 52px)":"100vh" },
     topbar:   { background:C.surf, borderBottom:`1px solid ${C.border}`, padding:"11px 22px", display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, zIndex:10 },
-    content:  { flex:1, padding:20, overflowY:"auto" },
-    g4:       { display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:18 },
-    g2:       { display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 },
-    card:     { background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:16 },
+    content:  { flex:1, padding: isMobile?12:20, overflowY:"auto" },
+    g4:       { display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(4,1fr)", gap: isMobile?8:12, marginBottom:18 },
+    g2:       { display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:14 },
+    card:     { background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding: isMobile?12:16 },
     sTitle:   { fontSize:9, fontWeight:700, color:C.muted, letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:12 },
     table:    { width:"100%", borderCollapse:"collapse" },
     th:       { textAlign:"left", padding:"6px 10px", fontSize:9, color:C.muted, letterSpacing:"0.12em", textTransform:"uppercase", borderBottom:`1px solid ${C.border}` },
     td:       { padding:"8px 10px", borderBottom:`1px solid ${C.border}18`, fontSize:11, verticalAlign:"middle" },
-    inp:      { width:"100%", background:C.surf, border:`1px solid ${C.border}`, borderRadius:5, padding:"6px 10px", color:C.text, fontSize:11, fontFamily:"inherit", boxSizing:"border-box" },
-    btn:      (bg=C.accent,fg="#000")=>({ background:bg, color:fg, border:"none", borderRadius:6, padding:"7px 14px", fontSize:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.08em", textTransform:"uppercase", whiteSpace:"nowrap" }),
-    btnGhost: { background:"transparent", color:C.muted, border:`1px solid ${C.border}`, borderRadius:6, padding:"7px 12px", fontSize:10, cursor:"pointer" },
+    inp:      { width:"100%", background:C.surf, border:`1px solid ${C.border}`, borderRadius:5, padding: isMobile?"9px 12px":"6px 10px", color:C.text, fontSize: isMobile?14:11, fontFamily:"inherit", boxSizing:"border-box" },
+    btn:      (bg=C.accent,fg="#000")=>({ background:bg, color:fg, border:"none", borderRadius:6, padding: isMobile?"9px 16px":"7px 14px", fontSize: isMobile?12:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.08em", textTransform:"uppercase", whiteSpace:"nowrap" }),
+    btnGhost: { background:"transparent", color:C.muted, border:`1px solid ${C.border}`, borderRadius:6, padding: isMobile?"8px 14px":"7px 12px", fontSize: isMobile?12:10, cursor:"pointer" },
     btnEdit:  { background:"transparent", color:C.blue, border:`1px solid ${C.blue}44`, borderRadius:5, padding:"3px 8px", fontSize:9, cursor:"pointer" },
-    modal:    { position:"fixed", inset:0, background:"#00000095", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100 },
-    mbox:     { background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:24, width:540, maxWidth:"95vw", maxHeight:"92vh", overflowY:"auto" },
+    modal:    { position:"fixed", inset:0, background:"#00000095", display:"flex", alignItems: isMobile?"flex-end":"center", justifyContent:"center", zIndex:100 },
+    mbox:     { background:C.card, border:`1px solid ${C.border}`, borderRadius: isMobile?"12px 12px 0 0":"10px", padding: isMobile?"20px 16px":24, width: isMobile?"100%":540, maxWidth:"100vw", maxHeight: isMobile?"92vh":"92vh", overflowY:"auto" },
     label:    { fontSize:9, color:C.muted, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:3, display:"block" },
     fr:       { marginBottom:12 },
-    r2:       { display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 },
-    r3:       { display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 },
+    r2:       { display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:10 },
+    r3:       { display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr 1fr", gap:10 },
     chipRow:  { display:"flex", flexWrap:"wrap", gap:6, marginTop:4 },
     chip:     (color)=>({ background:color+"18", border:`1px solid ${color}44`, color, padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:5 }),
   };
@@ -823,93 +838,152 @@ export default function App() {
   return (
     <div style={S.app}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet"/>
+      <style>{`* { -webkit-tap-highlight-color: transparent; } body { overflow-x: hidden; }`}</style>
 
-      {/* ══ SIDEBAR ══ */}
-      <div style={S.sidebar}>
-        <div style={{ padding:"0 14px 16px", borderBottom:`1px solid ${C.border}`, marginBottom:8 }}>
-          <div style={{ fontSize:14, fontWeight:800, color:C.accent }}>⚙ FAROL</div>
-          <div style={{ fontSize:9, color:C.muted, marginTop:1, letterSpacing:"0.1em" }}>MANUTENÇÃO</div>
-          <div style={{ fontSize:8, color:C.green, marginTop:4, display:"flex", alignItems:"center", gap:4 }}>
-            <div style={{ width:5, height:5, borderRadius:"50%", background:C.green }}/>banco conectado
+      {/* ══ SIDEBAR DESKTOP ══ */}
+      {!isMobile && (
+        <div style={S.sidebar}>
+          <div style={{ padding:"0 14px 16px", borderBottom:`1px solid ${C.border}`, marginBottom:8 }}>
+            <div style={{ fontSize:14, fontWeight:800, color:C.accent }}>⚙ FAROL</div>
+            <div style={{ fontSize:9, color:C.muted, marginTop:1, letterSpacing:"0.1em" }}>MANUTENÇÃO</div>
+            <div style={{ fontSize:8, color:C.green, marginTop:4, display:"flex", alignItems:"center", gap:4 }}>
+              <div style={{ width:5, height:5, borderRadius:"50%", background:C.green }}/>banco conectado
+            </div>
+          </div>
+          <div style={S.navSec}>Menu</div>
+          {[
+            {id:"dashboard",icon:"◈",label:"Dashboard"},
+            {id:"alertas",  icon:"⚠",label:"Alertas", badge:alertasCriticos.length||null},
+            {id:"ordens",   icon:"≡",label:"Ordens de Serviço"},
+            {id:"setores",  icon:"◫",label:"Por Setor"},
+            {id:"custos",   icon:"◎",label:"Custos"},
+            {id:"excluidas",icon:"🗑",label:"OS Excluídas", badge:excluidas.length||null},
+          ].map(a=>(
+            <div key={a.id} style={S.navItem(aba===a.id&&kpiAtivo===null||aba===a.id&&a.id!=="ordens")}
+              onClick={()=>{setAba(a.id);if(a.id!=="ordens")setKpiAtivo(null);}}>
+              <span>{a.icon}</span>{a.label}
+              {a.badge&&<span style={{ marginLeft:"auto", background:C.red+"33", color:C.red, borderRadius:10, padding:"1px 6px", fontSize:9, fontWeight:800 }}>{a.badge}</span>}
+            </div>
+          ))}
+          <div style={S.navSec}>Cadastros</div>
+          <div style={S.navItem(aba==="cadastros")} onClick={()=>setAba("cadastros")}><span>⊞</span>Cadastros</div>
+          {aba==="cadastros"&&[
+            {id:"tecnicos",    icon:"◉",label:"Técnicos"},
+            {id:"solicitantes",icon:"◌",label:"Solicitantes"},
+            {id:"setoresCad",  icon:"◧",label:"Setores"},
+            {id:"tiposServico",icon:"◑",label:"Tipos de Serviço"},
+          ].map(s=>(
+            <div key={s.id} style={S.navSub(subCadastro===s.id)} onClick={()=>setSubCadastro(s.id)}>{s.icon} {s.label}</div>
+          ))}
+          {alertasCriticos.length>0&&(
+            <div onClick={()=>setAba("alertas")} style={{ margin:"auto 8px 8px", background:C.red+"15", border:`1px solid ${C.red}33`, borderRadius:6, padding:"8px 10px", cursor:"pointer" }}>
+              <div style={{ fontSize:9, color:C.red, fontWeight:700 }}>⚠ ATENÇÃO</div>
+              <div style={{ fontSize:10, color:C.text, marginTop:2 }}>{alertasCriticos.length} OS atrasadas</div>
+            </div>
+          )}
+          <div style={{ padding:"10px 14px", borderTop:`1px solid ${C.border}`, marginTop:alertasCriticos.length?0:"auto" }}>
+            <div style={{ fontSize:9, color:C.muted }}>TOTAL OS</div>
+            <div style={{ fontSize:22, fontWeight:900, color:C.accent }}>{ordens.length}</div>
           </div>
         </div>
+      )}
 
-        <div style={S.navSec}>Menu</div>
-        {[
-          {id:"dashboard",icon:"◈",label:"Dashboard"},
-          {id:"alertas",  icon:"⚠",label:"Alertas", badge:alertasCriticos.length||null},
-          {id:"ordens",   icon:"≡",label:"Ordens de Serviço"},
-          {id:"setores",  icon:"◫",label:"Por Setor"},
-          {id:"custos",   icon:"◎",label:"Custos"},
-          {id:"excluidas",icon:"🗑",label:"OS Excluídas", badge:excluidas.length||null},
-        ].map(a=>(
-          <div key={a.id} style={S.navItem(aba===a.id&&kpiAtivo===null||aba===a.id&&a.id!=="ordens")}
-            onClick={()=>{setAba(a.id);if(a.id!=="ordens")setKpiAtivo(null);}}>
-            <span>{a.icon}</span>{a.label}
-            {a.badge&&<span style={{ marginLeft:"auto", background:C.red+"33", color:C.red, borderRadius:10, padding:"1px 6px", fontSize:9, fontWeight:800 }}>{a.badge}</span>}
+      {/* ══ DRAWER MOBILE ══ */}
+      {isMobile && menuAberto && (
+        <div style={S.sidebarMobile}>
+          <div style={S.sidebarDrawer}>
+            <div style={{ padding:"0 14px 14px", borderBottom:`1px solid ${C.border}`, marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:800, color:C.accent }}>⚙ FAROL</div>
+                <div style={{ fontSize:8, color:C.green, marginTop:3, display:"flex", alignItems:"center", gap:4 }}>
+                  <div style={{ width:5, height:5, borderRadius:"50%", background:C.green }}/>banco conectado
+                </div>
+              </div>
+              <button onClick={()=>setMenuAberto(false)} style={{ background:"transparent", border:"none", color:C.muted, fontSize:20, cursor:"pointer" }}>✕</button>
+            </div>
+            <div style={S.navSec}>Menu</div>
+            {[
+              {id:"dashboard",icon:"◈",label:"Dashboard"},
+              {id:"alertas",  icon:"⚠",label:"Alertas", badge:alertasCriticos.length||null},
+              {id:"ordens",   icon:"≡",label:"Ordens de Serviço"},
+              {id:"setores",  icon:"◫",label:"Por Setor"},
+              {id:"custos",   icon:"◎",label:"Custos"},
+              {id:"excluidas",icon:"🗑",label:"OS Excluídas", badge:excluidas.length||null},
+            ].map(a=>(
+              <div key={a.id} style={{ ...S.navItem(aba===a.id), padding:"12px 14px", fontSize:13 }}
+                onClick={()=>{setAba(a.id);if(a.id!=="ordens")setKpiAtivo(null);setMenuAberto(false);}}>
+                <span>{a.icon}</span>{a.label}
+                {a.badge&&<span style={{ marginLeft:"auto", background:C.red+"33", color:C.red, borderRadius:10, padding:"1px 6px", fontSize:10, fontWeight:800 }}>{a.badge}</span>}
+              </div>
+            ))}
+            <div style={S.navSec}>Cadastros</div>
+            <div style={{ ...S.navItem(aba==="cadastros"), padding:"12px 14px", fontSize:13 }}
+              onClick={()=>{setAba("cadastros");setMenuAberto(false);}}><span>⊞</span>Cadastros</div>
+            <div style={{ padding:"14px", borderTop:`1px solid ${C.border}`, marginTop:"auto" }}>
+              <div style={{ fontSize:10, fontWeight:700, color:C.text }}>{infoUsuario.nome}</div>
+              <div style={{ fontSize:9, color:C.muted }}>{infoUsuario.cargo}</div>
+              <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                <button onClick={()=>{setModalSenha(true);setMenuAberto(false);}} style={{ ...S.btnGhost, flex:1, fontSize:11 }}>🔑 Senha</button>
+                <button onClick={sair} style={{ ...S.btnGhost, flex:1, fontSize:11 }}>Sair</button>
+              </div>
+            </div>
           </div>
-        ))}
-
-        <div style={S.navSec}>Cadastros</div>
-        <div style={S.navItem(aba==="cadastros")} onClick={()=>setAba("cadastros")}><span>⊞</span>Cadastros</div>
-        {aba==="cadastros"&&[
-          {id:"tecnicos",    icon:"◉",label:"Técnicos"},
-          {id:"solicitantes",icon:"◌",label:"Solicitantes"},
-          {id:"setoresCad",  icon:"◧",label:"Setores"},
-          {id:"tiposServico",icon:"◑",label:"Tipos de Serviço"},
-        ].map(s=>(
-          <div key={s.id} style={S.navSub(subCadastro===s.id)} onClick={()=>setSubCadastro(s.id)}>{s.icon} {s.label}</div>
-        ))}
-
-        {alertasCriticos.length>0&&(
-          <div onClick={()=>setAba("alertas")} style={{ margin:"auto 8px 8px", background:C.red+"15", border:`1px solid ${C.red}33`, borderRadius:6, padding:"8px 10px", cursor:"pointer" }}>
-            <div style={{ fontSize:9, color:C.red, fontWeight:700 }}>⚠ ATENÇÃO</div>
-            <div style={{ fontSize:10, color:C.text, marginTop:2 }}>{alertasCriticos.length} OS atrasadas</div>
-          </div>
-        )}
-        <div style={{ padding:"10px 14px", borderTop:`1px solid ${C.border}`, marginTop:alertasCriticos.length?0:"auto" }}>
-          <div style={{ fontSize:9, color:C.muted }}>TOTAL OS</div>
-          <div style={{ fontSize:22, fontWeight:900, color:C.accent }}>{ordens.length}</div>
+          <div style={S.sidebarOverlay} onClick={()=>setMenuAberto(false)}/>
         </div>
-      </div>
+      )}
 
       {/* ══ MAIN ══ */}
       <div style={S.main}>
-        <div style={S.topbar}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{tituloPagina()}</div>
-            {kpiAtivo&&aba==="ordens"&&<button style={{...S.btnGhost,padding:"3px 8px",fontSize:9}} onClick={()=>setKpiAtivo(null)}>✕ limpar filtro</button>}
-          </div>
-          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-            <span style={{ fontSize:10, color:C.muted }}>{new Date().toLocaleDateString("pt-BR")}</span>
-            <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={carregarTudo} title="Recarregar dados">⟳</button>
-            <button style={{ background:"#1D6F42", color:"#fff", border:"none", borderRadius:6, padding:"6px 14px", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6, whiteSpace:"nowrap" }} onClick={exportarExcel} title="Exportar backup Excel">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#fff" fillOpacity="0.2" stroke="#fff" strokeWidth="1.5"/>
-                <path d="M14 2V8H20" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M8 13L10.5 17L8 21" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M16 13L13.5 17L16 21" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M10.5 17H13.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              Exportar Excel
-            </button>
-            {aba==="ordens"&&<button style={S.btn()} onClick={()=>{setEditOS(null);setModalOS(true);}}>+ Nova OS</button>}
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:8, paddingLeft:8, borderLeft:`1px solid ${C.border}` }}>
-              <div style={{ textAlign:"right" }}>
-                <div style={{ fontSize:10, fontWeight:700, color:C.text }}>{infoUsuario.nome}</div>
-                <div style={{ fontSize:9, color:C.muted }}>{infoUsuario.cargo}</div>
-              </div>
-              <button onClick={()=>setModalSenha(true)} title="Alterar senha"
-                style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 8px", color:C.muted, fontSize:12, cursor:"pointer" }}>
-                🔑
-              </button>
-              <button onClick={sair} title="Sair"
-                style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 10px", color:C.muted, fontSize:10, cursor:"pointer" }}>
-                Sair
+
+        {/* Topbar Mobile */}
+        {isMobile ? (
+          <div style={S.topbarMobile}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <button onClick={()=>setMenuAberto(true)} style={{ background:"transparent", border:"none", color:C.accent, fontSize:22, cursor:"pointer", padding:"2px 4px" }}>☰</button>
+              <div style={{ fontSize:12, fontWeight:800, color:C.accent }}>⚙ FAROL</div>
+              {alertasCriticos.length>0&&<span style={{ background:C.red+"33", color:C.red, borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800 }}>⚠{alertasCriticos.length}</span>}
+            </div>
+            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <button style={{...S.btn(),padding:"8px 14px",fontSize:12}} onClick={()=>{setEditOS(null);setModalOS(true);}}>+ OS</button>
+              <button onClick={()=>setMenuAberto(true)} style={{ background:C.accentDim, border:`1px solid ${C.accent}44`, borderRadius:6, padding:"6px 10px", color:C.accent, fontSize:10, fontWeight:700, cursor:"pointer" }}>
+                {infoUsuario.nome}
               </button>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Topbar Desktop */
+          <div style={S.topbar}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{tituloPagina()}</div>
+              {kpiAtivo&&aba==="ordens"&&<button style={{...S.btnGhost,padding:"3px 8px",fontSize:9}} onClick={()=>setKpiAtivo(null)}>✕ limpar filtro</button>}
+            </div>
+            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <span style={{ fontSize:10, color:C.muted }}>{new Date().toLocaleDateString("pt-BR")}</span>
+              <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={carregarTudo} title="Recarregar dados">⟳</button>
+              <button style={{ background:"#1D6F42", color:"#fff", border:"none", borderRadius:6, padding:"6px 14px", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6, whiteSpace:"nowrap" }} onClick={exportarExcel} title="Exportar backup Excel">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#fff" fillOpacity="0.2" stroke="#fff" strokeWidth="1.5"/>
+                  <path d="M14 2V8H20" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M8 13L10.5 17L8 21" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16 13L13.5 17L16 21" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10.5 17H13.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                Exportar Excel
+              </button>
+              {aba==="ordens"&&<button style={S.btn()} onClick={()=>{setEditOS(null);setModalOS(true);}}>+ Nova OS</button>}
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:8, paddingLeft:8, borderLeft:`1px solid ${C.border}` }}>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:C.text }}>{infoUsuario.nome}</div>
+                  <div style={{ fontSize:9, color:C.muted }}>{infoUsuario.cargo}</div>
+                </div>
+                <button onClick={()=>setModalSenha(true)} title="Alterar senha"
+                  style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 8px", color:C.muted, fontSize:12, cursor:"pointer" }}>🔑</button>
+                <button onClick={sair} title="Sair"
+                  style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 10px", color:C.muted, fontSize:10, cursor:"pointer" }}>Sair</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={S.content}>
 
@@ -988,17 +1062,30 @@ export default function App() {
           </>)}
 
           {aba==="ordens"&&(<>
+            {/* Filtros — empilhados no mobile */}
             <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap", alignItems:"center" }}>
-              <input style={{...S.inp,width:190}} placeholder="🔍 Buscar..." value={busca} onChange={e=>setBusca(e.target.value)}/>
-              <select style={{...S.inp,width:140}} value={filtroStatus} onChange={e=>setFiltroStatus(e.target.value)}>
-                <option>Todos</option><option>Concluido</option><option>Em Andamento</option>
-              </select>
-              <select style={{...S.inp,width:160}} value={filtroSetor} onChange={e=>setFiltroSetor(e.target.value)}>
-                {setoresOpts.map(s=><option key={s}>{s}</option>)}
-              </select>
-              <select style={{...S.inp,width:120}} value={filtroPrio} onChange={e=>setFiltroPrio(e.target.value)}>
-                <option>Todos</option><option>Urgente</option><option>Alta</option><option>Média</option><option>Baixa</option>
-              </select>
+              <input style={{...S.inp, width: isMobile?"100%":190}} placeholder="🔍 Buscar..." value={busca} onChange={e=>setBusca(e.target.value)}/>
+              {!isMobile && <>
+                <select style={{...S.inp,width:140}} value={filtroStatus} onChange={e=>setFiltroStatus(e.target.value)}>
+                  <option>Todos</option><option>Concluido</option><option>Em Andamento</option>
+                </select>
+                <select style={{...S.inp,width:160}} value={filtroSetor} onChange={e=>setFiltroSetor(e.target.value)}>
+                  {setoresOpts.map(s=><option key={s}>{s}</option>)}
+                </select>
+                <select style={{...S.inp,width:120}} value={filtroPrio} onChange={e=>setFiltroPrio(e.target.value)}>
+                  <option>Todos</option><option>Urgente</option><option>Alta</option><option>Média</option><option>Baixa</option>
+                </select>
+              </>}
+              {isMobile && (
+                <div style={{ display:"flex", gap:6, width:"100%" }}>
+                  <select style={{...S.inp,flex:1}} value={filtroStatus} onChange={e=>setFiltroStatus(e.target.value)}>
+                    <option>Todos</option><option>Concluido</option><option>Em Andamento</option>
+                  </select>
+                  <select style={{...S.inp,flex:1}} value={filtroPrio} onChange={e=>setFiltroPrio(e.target.value)}>
+                    <option>Todos</option><option>Urgente</option><option>Alta</option><option>Média</option><option>Baixa</option>
+                  </select>
+                </div>
+              )}
               <span style={{ fontSize:10, color:C.muted }}>{filtradas.length} resultado(s)</span>
               {(busca||filtroStatus!=="Todos"||filtroSetor!=="Todos"||filtroPrio!=="Todos")&&(
                 <button style={S.btnGhost} onClick={()=>{setBusca("");setFiltroStatus("Todos");setFiltroSetor("Todos");setFiltroPrio("Todos");}}>✕</button>
@@ -1009,52 +1096,89 @@ export default function App() {
                 </button>
               )}
             </div>
-            <div style={S.card}>
-              <table style={S.table}>
-                <thead><tr>
-                  <th style={S.th}>
-                    <input type="checkbox" checked={selecionadas.size===filtradas.length&&filtradas.length>0}
-                      onChange={e=>setSelecionadas(e.target.checked?new Set(filtradas.map(o=>o.id)):new Set())}
-                      style={{ cursor:"pointer" }}/>
-                  </th>
-                  {["#","Data","Setor","Solicitante","Serviço","Tipo","Técnico(s)","Prio","Status","Dias","Total",""].map((h,i)=><th key={i} style={S.th}>{h}</th>)}
-                </tr></thead>
-                <tbody>
-                  {filtradas.map(o=>{
-                    const dias=o.status==="Em Andamento"?diasAberta(o.dataInicio):null;
-                    const tipoInfo=tiposServico.find(t=>t.nome===o.tipoServico);
-                    const sel=selecionadas.has(o.id);
-                    return (
-                      <tr key={o.id} style={{ cursor:"pointer", background:sel?C.red+"08":"transparent" }}
-                        onMouseEnter={e=>{if(!sel)e.currentTarget.style.background="#ffffff05";}}
-                        onMouseLeave={e=>{e.currentTarget.style.background=sel?C.red+"08":"transparent";}}>
-                        <td style={S.td} onClick={e=>e.stopPropagation()}>
-                          <input type="checkbox" checked={sel} onChange={()=>toggleSelecao(o.id)} style={{ cursor:"pointer" }}/>
-                        </td>
-                        <td style={{...S.td,color:C.accent,fontWeight:800}} onClick={()=>setDetalhe(o)}>{String(o.id).padStart(3,"0")}</td>
-                        <td style={{...S.td,color:C.muted,whiteSpace:"nowrap"}} onClick={()=>setDetalhe(o)}>{fmtData(o.dataInicio)}</td>
-                        <td style={S.td} onClick={()=>setDetalhe(o)}>{o.setor}</td>
-                        <td style={{...S.td,color:C.muted}} onClick={()=>setDetalhe(o)}>{o.solicitante}</td>
-                        <td style={S.td} title={o.servico} onClick={()=>setDetalhe(o)}>{o.servico?.length>36?o.servico.substring(0,36)+"…":o.servico}</td>
-                        <td style={S.td} onClick={()=>setDetalhe(o)}>{tipoInfo?<Tag label={o.tipoServico} color={tipoInfo.cor}/>:<span style={{color:C.muted}}>{o.tipoServico}</span>}</td>
-                        <td style={S.td} onClick={()=>setDetalhe(o)}>{renderTecnicos(o)}</td>
-                        <td style={S.td} onClick={()=>setDetalhe(o)}><Tag label={o.prioridade} color={PRIO_COLOR[o.prioridade]}/></td>
-                        <td style={S.td} onClick={()=>setDetalhe(o)}><Tag label={o.status} color={STATUS_COLOR[o.status]||C.muted}/></td>
-                        <td style={S.td} onClick={()=>setDetalhe(o)}>{dias!==null?(dias>=30?<Tag label={`${dias}d`} color={C.red}/>:dias>=14?<Tag label={`${dias}d`} color="#e67e22"/>:dias>=7?<Tag label={`${dias}d`} color={C.yellow}/>:<span style={{color:C.muted,fontSize:10}}>{dias}d</span>):<span style={{color:C.muted,fontSize:10}}>—</span>}</td>
-                        <td style={{...S.td,color:C.accent,fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setDetalhe(o)}>{fmtBRL(totalOS(o))}</td>
-                        <td style={S.td} onClick={e=>e.stopPropagation()}>
-                          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
-                            {o.status==="Em Andamento"&&<button style={{...S.btn(C.green,"#000"),padding:"3px 8px",fontSize:9}} onClick={()=>concluirOS(o.id)}>✓</button>}
-                            {(o.anexos||[]).length>0&&<span style={{fontSize:9,color:C.muted}} title={`${o.anexos.length} anexo(s)`}>📎{o.anexos.length}</span>}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {filtradas.length===0&&<div style={{ textAlign:"center", padding:30, color:C.muted, fontSize:11 }}>Nenhuma OS encontrada</div>}
-            </div>
+
+            {/* MOBILE: cards */}
+            {isMobile ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:10, paddingBottom:80 }}>
+                {filtradas.map(o=>{
+                  const dias=o.status==="Em Andamento"?diasAberta(o.dataInicio):null;
+                  const corDias=dias>=30?C.red:dias>=14?"#e67e22":dias>=7?C.yellow:C.green;
+                  return (
+                    <div key={o.id} onClick={()=>setDetalhe(o)}
+                      style={{ background:C.card, border:`1px solid ${C.border}`, borderLeft:`3px solid ${STATUS_COLOR[o.status]||C.muted}`, borderRadius:8, padding:"12px 14px", cursor:"pointer" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                        <span style={{ fontSize:10, color:C.accent, fontWeight:800 }}>OS #{String(o.id).padStart(3,"0")}</span>
+                        <div style={{ display:"flex", gap:5 }}>
+                          <Tag label={o.status} color={STATUS_COLOR[o.status]||C.muted}/>
+                          {dias!==null&&<Tag label={`${dias}d`} color={corDias}/>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize:13, fontWeight:600, marginBottom:4, lineHeight:1.3 }}>{o.servico}</div>
+                      <div style={{ fontSize:11, color:C.muted, marginBottom:6 }}>{o.setor} · {fmtData(o.dataInicio)}</div>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+                          <Tag label={o.prioridade} color={PRIO_COLOR[o.prioridade]}/>
+                          {totalOS(o)>0&&<span style={{ fontSize:10, color:C.accent, fontWeight:700 }}>{fmtBRL(totalOS(o))}</span>}
+                          {(o.anexos||[]).length>0&&<span style={{fontSize:10,color:C.muted}}>📎{o.anexos.length}</span>}
+                        </div>
+                        {o.status==="Em Andamento"&&(
+                          <button style={{...S.btn(C.green,"#000"),padding:"6px 12px",fontSize:11}} onClick={e=>{e.stopPropagation();concluirOS(o.id);}}>✓</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {filtradas.length===0&&<div style={{ textAlign:"center", padding:40, color:C.muted, fontSize:11 }}>Nenhuma OS encontrada</div>}
+              </div>
+            ) : (
+              /* DESKTOP: tabela completa */
+              <div style={S.card}>
+                <table style={S.table}>
+                  <thead><tr>
+                    <th style={S.th}>
+                      <input type="checkbox" checked={selecionadas.size===filtradas.length&&filtradas.length>0}
+                        onChange={e=>setSelecionadas(e.target.checked?new Set(filtradas.map(o=>o.id)):new Set())}
+                        style={{ cursor:"pointer" }}/>
+                    </th>
+                    {["#","Data","Setor","Solicitante","Serviço","Tipo","Técnico(s)","Prio","Status","Dias","Total",""].map((h,i)=><th key={i} style={S.th}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {filtradas.map(o=>{
+                      const dias=o.status==="Em Andamento"?diasAberta(o.dataInicio):null;
+                      const tipoInfo=tiposServico.find(t=>t.nome===o.tipoServico);
+                      const sel=selecionadas.has(o.id);
+                      return (
+                        <tr key={o.id} style={{ cursor:"pointer", background:sel?C.red+"08":"transparent" }}
+                          onMouseEnter={e=>{if(!sel)e.currentTarget.style.background="#ffffff05";}}
+                          onMouseLeave={e=>{e.currentTarget.style.background=sel?C.red+"08":"transparent";}}>
+                          <td style={S.td} onClick={e=>e.stopPropagation()}>
+                            <input type="checkbox" checked={sel} onChange={()=>toggleSelecao(o.id)} style={{ cursor:"pointer" }}/>
+                          </td>
+                          <td style={{...S.td,color:C.accent,fontWeight:800}} onClick={()=>setDetalhe(o)}>{String(o.id).padStart(3,"0")}</td>
+                          <td style={{...S.td,color:C.muted,whiteSpace:"nowrap"}} onClick={()=>setDetalhe(o)}>{fmtData(o.dataInicio)}</td>
+                          <td style={S.td} onClick={()=>setDetalhe(o)}>{o.setor}</td>
+                          <td style={{...S.td,color:C.muted}} onClick={()=>setDetalhe(o)}>{o.solicitante}</td>
+                          <td style={S.td} title={o.servico} onClick={()=>setDetalhe(o)}>{o.servico?.length>36?o.servico.substring(0,36)+"…":o.servico}</td>
+                          <td style={S.td} onClick={()=>setDetalhe(o)}>{tipoInfo?<Tag label={o.tipoServico} color={tipoInfo.cor}/>:<span style={{color:C.muted}}>{o.tipoServico}</span>}</td>
+                          <td style={S.td} onClick={()=>setDetalhe(o)}>{renderTecnicos(o)}</td>
+                          <td style={S.td} onClick={()=>setDetalhe(o)}><Tag label={o.prioridade} color={PRIO_COLOR[o.prioridade]}/></td>
+                          <td style={S.td} onClick={()=>setDetalhe(o)}><Tag label={o.status} color={STATUS_COLOR[o.status]||C.muted}/></td>
+                          <td style={S.td} onClick={()=>setDetalhe(o)}>{dias!==null?(dias>=30?<Tag label={`${dias}d`} color={C.red}/>:dias>=14?<Tag label={`${dias}d`} color="#e67e22"/>:dias>=7?<Tag label={`${dias}d`} color={C.yellow}/>:<span style={{color:C.muted,fontSize:10}}>{dias}d</span>):<span style={{color:C.muted,fontSize:10}}>—</span>}</td>
+                          <td style={{...S.td,color:C.accent,fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setDetalhe(o)}>{fmtBRL(totalOS(o))}</td>
+                          <td style={S.td} onClick={e=>e.stopPropagation()}>
+                            <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                              {o.status==="Em Andamento"&&<button style={{...S.btn(C.green,"#000"),padding:"3px 8px",fontSize:9}} onClick={()=>concluirOS(o.id)}>✓</button>}
+                              {(o.anexos||[]).length>0&&<span style={{fontSize:9,color:C.muted}} title={`${o.anexos.length} anexo(s)`}>📎{o.anexos.length}</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {filtradas.length===0&&<div style={{ textAlign:"center", padding:30, color:C.muted, fontSize:11 }}>Nenhuma OS encontrada</div>}
+              </div>
+            )}
           </>)}
 
           {/* ══ SETORES ══ */}
@@ -1509,9 +1633,9 @@ export default function App() {
       )}
 
       {/* ══ BOTÕES FLUTUANTES ══ */}
-      <div style={{ position:"fixed",bottom:28,left:222,zIndex:90,display:"flex",flexDirection:"column",gap:12,alignItems:"flex-start" }}>
+      <div style={{ position:"fixed", bottom:28, left: isMobile?20:222, zIndex:90, display:"flex", flexDirection:"column", gap:12, alignItems:"flex-start" }}>
         <button onClick={()=>{setEditOS(null);setModalOS(true);}} title="Nova Ordem de Serviço"
-          style={{ width:60,height:60,borderRadius:"50%",background:"rgba(245,166,35,0.88)",border:"1.5px solid rgba(245,166,35,0.5)",color:"#000",fontSize:28,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(8px)",boxShadow:"0 4px 24px rgba(245,166,35,0.45)",transition:"all 0.18s",lineHeight:1 }}
+          style={{ width: isMobile?56:60, height: isMobile?56:60, borderRadius:"50%", background:"rgba(245,166,35,0.88)", border:"1.5px solid rgba(245,166,35,0.5)", color:"#000", fontSize: isMobile?26:28, fontWeight:900, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(8px)", boxShadow:"0 4px 24px rgba(245,166,35,0.45)", transition:"all 0.18s", lineHeight:1 }}
           onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.1)";e.currentTarget.style.boxShadow="0 6px 32px rgba(245,166,35,0.65)";}}
           onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow="0 4px 24px rgba(245,166,35,0.45)";}}>+</button>
       </div>
