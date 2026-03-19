@@ -568,7 +568,78 @@ export default function App() {
     showToast("OS reativada!");
   }
 
-  // ─── ANEXOS ─────────────────────────────────────────────────────────────────
+  // ─── EXPORTAR EXCEL ──────────────────────────────────────────────────────────
+  function exportarExcel() {
+    // Converte array de objetos para CSV com BOM UTF-8 (abre certo no Excel)
+    function toCSV(dados, colunas) {
+      const header = colunas.map(c => c.label).join(";");
+      const rows = dados.map(d =>
+        colunas.map(c => {
+          const val = c.fn ? c.fn(d) : (d[c.key] ?? "");
+          const str = String(val).replace(/"/g, '""');
+          return `"${str}"`;
+        }).join(";")
+      );
+      return "\uFEFF" + [header, ...rows].join("\n");
+    }
+
+    const agora = new Date().toLocaleDateString("pt-BR").replace(/\//g,"-");
+
+    // ── Planilha 1: Ordens de Serviço ──
+    const colOS = [
+      { label:"ID",             key:"id" },
+      { label:"Data Início",    fn: o => fmtData(o.dataInicio) },
+      { label:"Setor",          key:"setor" },
+      { label:"Solicitante",    key:"solicitante" },
+      { label:"Serviço",        key:"servico" },
+      { label:"Tipo",           key:"tipoServico" },
+      { label:"Prioridade",     key:"prioridade" },
+      { label:"Status",         key:"status" },
+      { label:"Técnico(s)",     fn: o => toArray(o.tecnicos).join(" + ") },
+      { label:"Valor Serviço",  fn: o => Number(o.valorServico||0).toFixed(2).replace(".",",") },
+      { label:"Valor Peças",    fn: o => Number(o.valorPecas||0).toFixed(2).replace(".",",") },
+      { label:"Total",          fn: o => totalOS(o).toFixed(2).replace(".",",") },
+      { label:"NF/OS",          key:"nf" },
+      { label:"Data Conclusão", fn: o => fmtData(o.dataConclusao) },
+      { label:"Observações",    key:"obs" },
+      { label:"Qtd Anexos",     fn: o => (o.anexos||[]).length },
+    ];
+
+    // ── Planilha 2: Técnicos ──
+    const colTec = [
+      { label:"Nome",        key:"nome" },
+      { label:"Tipo",        key:"tipo" },
+      { label:"Especialidade",key:"especialidade" },
+      { label:"Telefone",    key:"telefone" },
+      { label:"Status",      fn: t => t.ativo ? "Ativo" : "Inativo" },
+    ];
+
+    // ── Planilha 3: Solicitantes ──
+    const colSol = [
+      { label:"Nome",  key:"nome" },
+      { label:"Setor", key:"setor" },
+      { label:"Cargo", key:"cargo" },
+      { label:"Status",fn: s => s.ativo ? "Ativo" : "Inativo" },
+    ];
+
+    // Gera e baixa cada CSV
+    const arquivos = [
+      { nome:`farol-ordens-${agora}.csv`,      csv: toCSV([...ordens,...excluidas], colOS) },
+      { nome:`farol-tecnicos-${agora}.csv`,     csv: toCSV(tecnicos, colTec) },
+      { nome:`farol-solicitantes-${agora}.csv`, csv: toCSV(solicitantes, colSol) },
+    ];
+
+    arquivos.forEach(({ nome, csv }) => {
+      const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = nome;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    });
+
+    showToast("3 arquivos exportados — verifique seus downloads!");
+  }
   async function lerArquivos(files, osId) {
     Array.from(files).forEach(file => {
       if (file.size > 10*1024*1024) { showToast(`"${file.name}" muito grande (máx 10MB)`,"erro"); return; }
@@ -813,6 +884,7 @@ export default function App() {
           <div style={{ display:"flex", gap:8, alignItems:"center" }}>
             <span style={{ fontSize:10, color:C.muted }}>{new Date().toLocaleDateString("pt-BR")}</span>
             <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={carregarTudo} title="Recarregar dados">⟳</button>
+            <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={exportarExcel} title="Exportar backup Excel">⬇ Excel</button>
             {aba==="ordens"&&<button style={S.btn()} onClick={()=>{setEditOS(null);setModalOS(true);}}>+ Nova OS</button>}
             <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:8, paddingLeft:8, borderLeft:`1px solid ${C.border}` }}>
               <div style={{ textAlign:"right" }}>
