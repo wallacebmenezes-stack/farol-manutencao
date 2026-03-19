@@ -6,6 +6,95 @@ const SUPABASE_URL  = "https://teyxiznmkkmhqbufmuvp.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRleXhpem5ta2ttaHFidWZtdXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDYzMzgsImV4cCI6MjA4OTQ4MjMzOH0.5MS6G6jH7ztr0GL1-zkVZN6uAtuHi-w9XfVxnza949k";
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// Mapa de usuários → nome de exibição
+const USUARIOS = {
+  "cabanamanutencao26@gmail.com": { nome: "Hildo",  cargo: "Chefe de Manutenção" },
+  "lenilza.keully@hotmail.com":   { nome: "Lena",   cargo: "Gestora Geral" },
+};
+
+// ─── TELA DE LOGIN ────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [email,    setEmail]    = useState("");
+  const [senha,    setSenha]    = useState("");
+  const [erro,     setErro]     = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [mostrarS, setMostrarS] = useState(false);
+
+  async function entrar(e) {
+    e.preventDefault();
+    setErro(""); setLoading(true);
+    const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password: senha });
+    setLoading(false);
+    if (error) { setErro("E-mail ou senha incorretos."); return; }
+    onLogin(data.user);
+  }
+
+  return (
+    <div style={{ fontFamily:"'JetBrains Mono','Fira Code',monospace", background:"#080c10", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet"/>
+      <div style={{ width:340, padding:36, background:"#0e1318", border:"1px solid #1e2830", borderRadius:12, boxShadow:"0 8px 40px rgba(0,0,0,0.6)" }}>
+
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:32 }}>
+          <div style={{ fontSize:32, marginBottom:6 }}>⚙</div>
+          <div style={{ fontSize:20, fontWeight:800, color:"#f5a623", letterSpacing:"0.1em" }}>FAROL</div>
+          <div style={{ fontSize:10, color:"#5a7080", letterSpacing:"0.2em", marginTop:2 }}>SISTEMA DE MANUTENÇÃO</div>
+        </div>
+
+        <form onSubmit={entrar}>
+          {/* Email */}
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:9, color:"#5a7080", letterSpacing:"0.12em", textTransform:"uppercase", display:"block", marginBottom:5 }}>E-mail</label>
+            <input
+              type="email" value={email} onChange={e=>setEmail(e.target.value)} required
+              placeholder="seu@email.com"
+              style={{ width:"100%", background:"#131920", border:"1px solid #1e2830", borderRadius:6, padding:"9px 12px", color:"#dde6ee", fontSize:12, fontFamily:"inherit", boxSizing:"border-box", outline:"none" }}
+              onFocus={e=>e.target.style.borderColor="#f5a623"}
+              onBlur={e=>e.target.style.borderColor="#1e2830"}
+            />
+          </div>
+
+          {/* Senha */}
+          <div style={{ marginBottom:20 }}>
+            <label style={{ fontSize:9, color:"#5a7080", letterSpacing:"0.12em", textTransform:"uppercase", display:"block", marginBottom:5 }}>Senha</label>
+            <div style={{ position:"relative" }}>
+              <input
+                type={mostrarS?"text":"password"} value={senha} onChange={e=>setSenha(e.target.value)} required
+                placeholder="••••••••"
+                style={{ width:"100%", background:"#131920", border:"1px solid #1e2830", borderRadius:6, padding:"9px 38px 9px 12px", color:"#dde6ee", fontSize:12, fontFamily:"inherit", boxSizing:"border-box", outline:"none" }}
+                onFocus={e=>e.target.style.borderColor="#f5a623"}
+                onBlur={e=>e.target.style.borderColor="#1e2830"}
+              />
+              <span onClick={()=>setMostrarS(!mostrarS)}
+                style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", cursor:"pointer", fontSize:14, color:"#5a7080", userSelect:"none" }}>
+                {mostrarS ? "🙈" : "👁"}
+              </span>
+            </div>
+          </div>
+
+          {/* Erro */}
+          {erro && (
+            <div style={{ marginBottom:14, padding:"8px 12px", background:"#e74c3c18", border:"1px solid #e74c3c44", borderRadius:6, fontSize:10, color:"#e74c3c" }}>
+              ⚠ {erro}
+            </div>
+          )}
+
+          {/* Botão */}
+          <button type="submit" disabled={loading}
+            style={{ width:"100%", background: loading?"#5a7080":"#f5a623", color:"#000", border:"none", borderRadius:7, padding:"11px", fontSize:11, fontWeight:800, cursor: loading?"not-allowed":"pointer", letterSpacing:"0.1em", textTransform:"uppercase", transition:"all 0.15s" }}>
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
+        </form>
+
+        <div style={{ marginTop:20, fontSize:9, color:"#5a7080", textAlign:"center", lineHeight:1.6 }}>
+          Acesso restrito a usuários autorizados.<br/>
+          Em caso de dúvidas, contate o administrador.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const hoje      = new Date();
 const diasAberta = (d) => Math.floor((hoje - new Date(d + "T00:00:00")) / 86400000);
@@ -169,6 +258,43 @@ function TecnicosSelector({ value, onChange, opcoes }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  // ── Autenticação ──
+  const [usuario, setUsuario] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    // Verifica sessão existente ao abrir
+    sb.auth.getSession().then(({ data: { session } }) => {
+      setUsuario(session?.user || null);
+      setAuthLoading(false);
+    });
+    // Escuta mudanças de sessão
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
+      setUsuario(session?.user || null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function sair() {
+    await sb.auth.signOut();
+    setUsuario(null);
+  }
+
+  // Enquanto verifica sessão
+  if (authLoading) return (
+    <div style={{ fontFamily:"'JetBrains Mono',monospace", background:"#080c10", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", color:"#5a7080", fontSize:12 }}>
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet"/>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontSize:14, fontWeight:800, color:"#f5a623", marginBottom:12 }}>⚙ FAROL</div>
+        <div>Verificando sessão...</div>
+      </div>
+    </div>
+  );
+
+  // Tela de login se não autenticado
+  if (!usuario) return <LoginScreen onLogin={setUsuario} />;
+
+  const infoUsuario = USUARIOS[usuario.email] || { nome: usuario.email, cargo: "Usuário" };
   // ── Estado de dados ──
   const [ordens,       setOrdens]       = useState([]);
   const [excluidas,    setExcluidas]    = useState([]);
@@ -625,6 +751,16 @@ export default function App() {
             <span style={{ fontSize:10, color:C.muted }}>{new Date().toLocaleDateString("pt-BR")}</span>
             <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={carregarTudo} title="Recarregar dados">⟳</button>
             {aba==="ordens"&&<button style={S.btn()} onClick={()=>{setEditOS(null);setModalOS(true);}}>+ Nova OS</button>}
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:8, paddingLeft:8, borderLeft:`1px solid ${C.border}` }}>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:10, fontWeight:700, color:C.text }}>{infoUsuario.nome}</div>
+                <div style={{ fontSize:9, color:C.muted }}>{infoUsuario.cargo}</div>
+              </div>
+              <button onClick={sair} title="Sair"
+                style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 10px", color:C.muted, fontSize:10, cursor:"pointer" }}>
+                Sair
+              </button>
+            </div>
           </div>
         </div>
 
