@@ -32,6 +32,9 @@ const fromDB = (o) => ({
   obs:           o.obs || "",
   anexos:        o.anexos || [],
   criadoEm:      o.criado_em,
+  excluido:      o.excluido || false,
+  excluidoEm:    o.excluido_em || null,
+  excluidoPor:   o.excluido_por || null,
 });
 
 // Converte formato do sistema → linha do banco
@@ -168,6 +171,7 @@ function TecnicosSelector({ value, onChange, opcoes }) {
 export default function App() {
   // ── Estado de dados ──
   const [ordens,       setOrdens]       = useState([]);
+  const [excluidas,    setExcluidas]    = useState([]);
   const [tecnicos,     setTecnicos]     = useState([]);
   const [solicitantes, setSolicitantes] = useState([]);
   const [setoresList,  setSetoresList]  = useState([]);
@@ -217,20 +221,23 @@ export default function App() {
   const carregarTudo = useCallback(async () => {
     setLoading(true); setErro(null);
     try {
-      const [oRes, tRes, sRes, setRes, tipRes] = await Promise.all([
-        sb.from("ordens").select("*").order("id", { ascending: false }),
+      const [oRes, oExcRes, tRes, sRes, setRes, tipRes] = await Promise.all([
+        sb.from("ordens").select("*").eq("excluido", false).order("id", { ascending: false }),
+        sb.from("ordens").select("*").eq("excluido", true).order("excluido_em", { ascending: false }),
         sb.from("tecnicos").select("*").order("nome"),
         sb.from("solicitantes").select("*").order("nome"),
         sb.from("setores").select("*").order("nome"),
         sb.from("tipos_servico").select("*").order("nome"),
       ]);
-      if (oRes.error)   throw oRes.error;
-      if (tRes.error)   throw tRes.error;
-      if (sRes.error)   throw sRes.error;
-      if (setRes.error) throw setRes.error;
-      if (tipRes.error) throw tipRes.error;
+      if (oRes.error)    throw oRes.error;
+      if (oExcRes.error) throw oExcRes.error;
+      if (tRes.error)    throw tRes.error;
+      if (sRes.error)    throw sRes.error;
+      if (setRes.error)  throw setRes.error;
+      if (tipRes.error)  throw tipRes.error;
 
       setOrdens(oRes.data.map(fromDB));
+      setExcluidas(oExcRes.data.map(fromDB));
       setTecnicos(tRes.data);
       setSolicitantes(sRes.data);
       setSetoresList(setRes.data.map(s=>s.nome));
@@ -296,33 +303,73 @@ export default function App() {
 
   async function concluirOS(id) {
     const hoje_str = new Date().toISOString().split("T")[0];
-    const osAntes  = ordens.find(o => o.id === id);
     const { error } = await sb.from("ordens").update({ status:"Concluido", data_conclusao: hoje_str }).eq("id", id);
     if (error) { showToast("Erro ao concluir OS","erro"); return; }
     setOrdens(prev => prev.map(o => o.id===id ? {...o, status:"Concluido", dataConclusao:hoje_str} : o));
     setDetalhe(prev => prev ? {...prev, status:"Concluido", dataConclusao:hoje_str} : null);
 
-    // Inicia contagem regressiva de 30s para undo
+    // Undo com contagem regressiva de 30s
+    if (undoInfo?.intervalo) clearInterval(undoInfo.intervalo);
     let seg = 30;
     setUndoSeg(seg);
-    setUndoInfo({ id, osAntes });
     const intervalo = setInterval(() => {
       seg--;
-      setUndoSeg(seg);
+      setUndoSeg(s => s - 1);
       if (seg <= 0) { clearInterval(intervalo); setUndoInfo(null); setUndoSeg(0); }
     }, 1000);
-    setUndoInfo({ id, osAntes, intervalo });
+    setUndoInfo({ id, intervalo });
   }
 
   async function desfazerConclusao() {
     if (!undoInfo) return;
     clearInterval(undoInfo.intervalo);
-    const { id, osAntes } = undoInfo;
+    const { id } = undoInfo;
     const { error } = await sb.from("ordens").update({ status:"Em Andamento", data_conclusao: null }).eq("id", id);
     if (error) { showToast("Erro ao desfazer","erro"); return; }
     setOrdens(prev => prev.map(o => o.id===id ? {...o, status:"Em Andamento", dataConclusao:null} : o));
     setUndoInfo(null); setUndoSeg(0);
     showToast("Conclusão desfeita!");
+  }
+
+  // ── Seleção múltipla para exclusão ──
+  const [selecionadas, setSelecionadas] = useState(new Set());
+  const [confirmExcluir, setConfirmExcluir] = useState(false);
+
+  function toggleSelecao(id) {
+    setSelecionadas(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  async function excluirSelecionadas(quem = "Gestor") {
+    const ids = [...selecionadas];
+    if (!ids.length) return;
+    const agora = new Date().toISOString();
+    const { error } = await sb.from("ordens").update({
+      excluido: true, excluido_em: agora, excluido_por: quem
+    }).in("id", ids);
+    if (error) { showToast("Erro ao excluir","erro"); return; }
+    const movidas = ordens.filter(o => ids.includes(o.id)).map(o => ({
+      ...o, excluido:true, excluidoEm:agora, excluidoPor:quem
+    }));
+    setOrdens(prev => prev.filter(o => !ids.includes(o.id)));
+    setExcluidas(prev => [...movidas, ...prev]);
+    setSelecionadas(new Set());
+    setConfirmExcluir(false);
+    showToast(`${ids.length} OS excluída(s)`);
+  }
+
+  async function reativarOS(id) {
+    const { error } = await sb.from("ordens").update({
+      excluido: false, excluido_em: null, excluido_por: null
+    }).eq("id", id);
+    if (error) { showToast("Erro ao reativar","erro"); return; }
+    const os = excluidas.find(o => o.id === id);
+    setExcluidas(prev => prev.filter(o => o.id !== id));
+    setOrdens(prev => [{ ...os, excluido:false, excluidoEm:null, excluidoPor:null }, ...prev]);
+    showToast("OS reativada!");
   }
 
   // ─── ANEXOS ─────────────────────────────────────────────────────────────────
@@ -486,7 +533,7 @@ export default function App() {
   const tituloPagina = () => {
     if (aba==="cadastros") return `Cadastros › ${{tecnicos:"Técnicos",solicitantes:"Solicitantes",setoresCad:"Setores",tiposServico:"Tipos de Serviço"}[subCadastro]}`;
     if (aba==="ordens"&&kpiAtivo) return {total:"Todas as OS",andamento:"OS Em Andamento",concluidas:"OS Concluídas",alertas:"OS com Alerta"}[kpiAtivo];
-    return {dashboard:"Dashboard",alertas:"Alertas",ordens:"Ordens de Serviço",setores:"Por Setor",custos:"Custos"}[aba]||"";
+    return {dashboard:"Dashboard",alertas:"Alertas",ordens:"Ordens de Serviço",setores:"Por Setor",custos:"Custos",excluidas:"OS Excluídas"}[aba]||"";
   };
 
   // ─── TELA DE CARREGAMENTO ──────────────────────────────────────────────────
@@ -528,6 +575,7 @@ export default function App() {
           {id:"ordens",   icon:"≡",label:"Ordens de Serviço"},
           {id:"setores",  icon:"◫",label:"Por Setor"},
           {id:"custos",   icon:"◎",label:"Custos"},
+          {id:"excluidas",icon:"🗑",label:"OS Excluídas", badge:excluidas.length||null},
         ].map(a=>(
           <div key={a.id} style={S.navItem(aba===a.id&&kpiAtivo===null||aba===a.id&&a.id!=="ordens")}
             onClick={()=>{setAba(a.id);if(a.id!=="ordens")setKpiAtivo(null);}}>
@@ -649,7 +697,6 @@ export default function App() {
             {alertas.length===0&&<div style={{...S.card,textAlign:"center",padding:40,color:C.green}}>✓ Nenhuma OS em aberto!</div>}
           </>)}
 
-          {/* ══ ORDENS ══ */}
           {aba==="ordens"&&(<>
             <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap", alignItems:"center" }}>
               <input style={{...S.inp,width:190}} placeholder="🔍 Buscar..." value={busca} onChange={e=>setBusca(e.target.value)}/>
@@ -666,31 +713,45 @@ export default function App() {
               {(busca||filtroStatus!=="Todos"||filtroSetor!=="Todos"||filtroPrio!=="Todos")&&(
                 <button style={S.btnGhost} onClick={()=>{setBusca("");setFiltroStatus("Todos");setFiltroSetor("Todos");setFiltroPrio("Todos");}}>✕</button>
               )}
+              {selecionadas.size > 0 && (
+                <button style={{...S.btn(C.red,"#fff"),marginLeft:"auto"}} onClick={()=>setConfirmExcluir(true)}>
+                  🗑 Excluir {selecionadas.size} OS
+                </button>
+              )}
             </div>
             <div style={S.card}>
               <table style={S.table}>
                 <thead><tr>
+                  <th style={S.th}>
+                    <input type="checkbox" checked={selecionadas.size===filtradas.length&&filtradas.length>0}
+                      onChange={e=>setSelecionadas(e.target.checked?new Set(filtradas.map(o=>o.id)):new Set())}
+                      style={{ cursor:"pointer" }}/>
+                  </th>
                   {["#","Data","Setor","Solicitante","Serviço","Tipo","Técnico(s)","Prio","Status","Dias","Total",""].map((h,i)=><th key={i} style={S.th}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {filtradas.map(o=>{
                     const dias=o.status==="Em Andamento"?diasAberta(o.dataInicio):null;
                     const tipoInfo=tiposServico.find(t=>t.nome===o.tipoServico);
+                    const sel=selecionadas.has(o.id);
                     return (
-                      <tr key={o.id} onClick={()=>setDetalhe(o)} style={{ cursor:"pointer" }}
-                        onMouseEnter={e=>e.currentTarget.style.background="#ffffff05"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <td style={{...S.td,color:C.accent,fontWeight:800}}>{String(o.id).padStart(3,"0")}</td>
-                        <td style={{...S.td,color:C.muted,whiteSpace:"nowrap"}}>{fmtData(o.dataInicio)}</td>
-                        <td style={S.td}>{o.setor}</td>
-                        <td style={{...S.td,color:C.muted}}>{o.solicitante}</td>
-                        <td style={S.td} title={o.servico}>{o.servico?.length>36?o.servico.substring(0,36)+"…":o.servico}</td>
-                        <td style={S.td}>{tipoInfo?<Tag label={o.tipoServico} color={tipoInfo.cor}/>:<span style={{color:C.muted}}>{o.tipoServico}</span>}</td>
-                        <td style={S.td}>{renderTecnicos(o)}</td>
-                        <td style={S.td}><Tag label={o.prioridade} color={PRIO_COLOR[o.prioridade]}/></td>
-                        <td style={S.td}><Tag label={o.status} color={STATUS_COLOR[o.status]||C.muted}/></td>
-                        <td style={S.td}>{dias!==null?(dias>=30?<Tag label={`${dias}d`} color={C.red}/>:dias>=14?<Tag label={`${dias}d`} color="#e67e22"/>:dias>=7?<Tag label={`${dias}d`} color={C.yellow}/>:<span style={{color:C.muted,fontSize:10}}>{dias}d</span>):<span style={{color:C.muted,fontSize:10}}>—</span>}</td>
-                        <td style={{...S.td,color:C.accent,fontWeight:700,whiteSpace:"nowrap"}}>{fmtBRL(totalOS(o))}</td>
+                      <tr key={o.id} style={{ cursor:"pointer", background:sel?C.red+"08":"transparent" }}
+                        onMouseEnter={e=>{if(!sel)e.currentTarget.style.background="#ffffff05";}}
+                        onMouseLeave={e=>{e.currentTarget.style.background=sel?C.red+"08":"transparent";}}>
+                        <td style={S.td} onClick={e=>e.stopPropagation()}>
+                          <input type="checkbox" checked={sel} onChange={()=>toggleSelecao(o.id)} style={{ cursor:"pointer" }}/>
+                        </td>
+                        <td style={{...S.td,color:C.accent,fontWeight:800}} onClick={()=>setDetalhe(o)}>{String(o.id).padStart(3,"0")}</td>
+                        <td style={{...S.td,color:C.muted,whiteSpace:"nowrap"}} onClick={()=>setDetalhe(o)}>{fmtData(o.dataInicio)}</td>
+                        <td style={S.td} onClick={()=>setDetalhe(o)}>{o.setor}</td>
+                        <td style={{...S.td,color:C.muted}} onClick={()=>setDetalhe(o)}>{o.solicitante}</td>
+                        <td style={S.td} title={o.servico} onClick={()=>setDetalhe(o)}>{o.servico?.length>36?o.servico.substring(0,36)+"…":o.servico}</td>
+                        <td style={S.td} onClick={()=>setDetalhe(o)}>{tipoInfo?<Tag label={o.tipoServico} color={tipoInfo.cor}/>:<span style={{color:C.muted}}>{o.tipoServico}</span>}</td>
+                        <td style={S.td} onClick={()=>setDetalhe(o)}>{renderTecnicos(o)}</td>
+                        <td style={S.td} onClick={()=>setDetalhe(o)}><Tag label={o.prioridade} color={PRIO_COLOR[o.prioridade]}/></td>
+                        <td style={S.td} onClick={()=>setDetalhe(o)}><Tag label={o.status} color={STATUS_COLOR[o.status]||C.muted}/></td>
+                        <td style={S.td} onClick={()=>setDetalhe(o)}>{dias!==null?(dias>=30?<Tag label={`${dias}d`} color={C.red}/>:dias>=14?<Tag label={`${dias}d`} color="#e67e22"/>:dias>=7?<Tag label={`${dias}d`} color={C.yellow}/>:<span style={{color:C.muted,fontSize:10}}>{dias}d</span>):<span style={{color:C.muted,fontSize:10}}>—</span>}</td>
+                        <td style={{...S.td,color:C.accent,fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setDetalhe(o)}>{fmtBRL(totalOS(o))}</td>
                         <td style={S.td} onClick={e=>e.stopPropagation()}>
                           <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                             {o.status==="Em Andamento"&&<button style={{...S.btn(C.green,"#000"),padding:"3px 8px",fontSize:9}} onClick={()=>concluirOS(o.id)}>✓</button>}
@@ -770,7 +831,47 @@ export default function App() {
             </div>
           </>)}
 
-          {/* ══ CADASTROS ══ */}
+          {/* ══ OS EXCLUÍDAS ══ */}
+          {aba==="excluidas"&&(
+            <div style={S.card}>
+              {excluidas.length===0
+                ?<div style={{ textAlign:"center", padding:40, color:C.muted, fontSize:11 }}>Nenhuma OS excluída</div>
+                :<>
+                  <div style={{ fontSize:10, color:C.muted, marginBottom:12 }}>
+                    {excluidas.length} OS excluída(s) — clique em reativar para restaurar ao sistema
+                  </div>
+                  <table style={S.table}>
+                    <thead><tr>
+                      {["#","Data OS","Setor","Serviço","Excluída em","Excluída por","Status original",""].map(h=><th key={h} style={S.th}>{h}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      {excluidas.map(o=>(
+                        <tr key={o.id} style={{ opacity:0.75 }}
+                          onMouseEnter={e=>e.currentTarget.style.opacity="1"}
+                          onMouseLeave={e=>e.currentTarget.style.opacity="0.75"}>
+                          <td style={{...S.td,color:C.muted,fontWeight:700}}>{String(o.id).padStart(3,"0")}</td>
+                          <td style={{...S.td,color:C.muted}}>{fmtData(o.dataInicio)}</td>
+                          <td style={S.td}>{o.setor}</td>
+                          <td style={S.td}>{o.servico?.length>40?o.servico.substring(0,40)+"…":o.servico}</td>
+                          <td style={{...S.td,color:C.red}}>
+                            {o.excluidoEm ? new Date(o.excluidoEm).toLocaleString("pt-BR") : "—"}
+                          </td>
+                          <td style={{...S.td,color:C.muted}}>{o.excluidoPor||"—"}</td>
+                          <td style={S.td}><Tag label={o.status} color={STATUS_COLOR[o.status]||C.muted}/></td>
+                          <td style={S.td}>
+                            <div style={{ display:"flex", gap:5 }}>
+                              <button style={S.btn(C.green,"#000")} onClick={()=>reativarOS(o.id)}>↩ Reativar</button>
+                              <button style={S.btn(C.blue,"#fff")} onClick={()=>{setEditOS({...o,tecnicos:toArray(o.tecnicos)});setModalOS(true);}}>✏ Editar</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              }
+            </div>
+          )}
           {aba==="cadastros"&&(<>
 
             {/* Técnicos */}
@@ -1093,6 +1194,25 @@ export default function App() {
                 <a href={previewAnexo.data} download={previewAnexo.nome} style={{...S.btn(C.accent,"#000"),textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>⬇ Baixar</a>
               </div>
             }
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL CONFIRMAR EXCLUSÃO ══ */}
+      {confirmExcluir&&(
+        <div style={S.modal} onClick={()=>setConfirmExcluir(false)}>
+          <div style={{...S.mbox,width:420}} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:13, fontWeight:800, color:C.red, marginBottom:12 }}>🗑 Confirmar exclusão</div>
+            <div style={{ fontSize:11, color:C.text, marginBottom:8 }}>
+              Você está prestes a excluir <strong style={{color:C.red}}>{selecionadas.size} OS</strong>.
+            </div>
+            <div style={{ fontSize:10, color:C.muted, marginBottom:20, padding:"8px 12px", background:C.yellow+"10", border:`1px solid ${C.yellow}30`, borderRadius:6 }}>
+              ⚠ As OS não serão apagadas permanentemente — ficarão na aba "OS Excluídas" e podem ser reativadas a qualquer momento.
+            </div>
+            <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+              <button style={S.btnGhost} onClick={()=>setConfirmExcluir(false)}>Cancelar</button>
+              <button style={S.btn(C.red,"#fff")} onClick={()=>excluirSelecionadas("Gestor")}>Confirmar exclusão</button>
+            </div>
           </div>
         </div>
       )}
