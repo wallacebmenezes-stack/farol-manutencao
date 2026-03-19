@@ -385,6 +385,8 @@ export default function App() {
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [filtroSetor,  setFiltroSetor]  = useState("Todos");
   const [filtroPrio,   setFiltroPrio]   = useState("Todos");
+  const [filtroMes,    setFiltroMes]    = useState("Todos");
+  const [filtroAno,    setFiltroAno]    = useState("Todos");
   const [busca,        setBusca]        = useState("");
   const [kpiAtivo,     setKpiAtivo]     = useState(null);
 
@@ -490,9 +492,11 @@ export default function App() {
     if (filtroStatus!=="Todos") b = b.filter(o=>o.status===filtroStatus);
     if (filtroSetor !=="Todos") b = b.filter(o=>o.setor===filtroSetor);
     if (filtroPrio  !=="Todos") b = b.filter(o=>o.prioridade===filtroPrio);
-    if (busca) { const q=busca.toLowerCase(); b=b.filter(o=>[o.servico,o.solicitante,o.setor,...toArray(o.tecnicos)].some(x=>x.toLowerCase().includes(q))); }
+    if (filtroMes   !=="Todos") b = b.filter(o=>o.dataInicio?.substring(5,7)===filtroMes);
+    if (filtroAno   !=="Todos") b = b.filter(o=>o.dataInicio?.substring(0,4)===filtroAno);
+    if (busca) { const q=busca.toLowerCase(); b=b.filter(o=>[o.servico,o.solicitante,o.setor,...toArray(o.tecnicos)].some(x=>x?.toLowerCase().includes(q))); }
     return b;
-  }, [ordensFiltradas, kpiAtivo, filtroStatus, filtroSetor, filtroPrio, busca, filialAtiva]);
+  }, [ordensFiltradas, kpiAtivo, filtroStatus, filtroSetor, filtroPrio, filtroMes, filtroAno, busca, filialAtiva]);
 
   const gastoMes = useMemo(()=>{ const m={}; ordensFiltradas.forEach(o=>{const k=o.dataInicio?.substring(0,7)||""; m[k]=(m[k]||0)+totalOS(o);}); return Object.entries(m).sort(); },[ordensFiltradas]);
   const maxMes   = Math.max(...gastoMes.map(([,v])=>v),1);
@@ -1217,6 +1221,18 @@ export default function App() {
                 <select style={{...S.inp,width:120}} value={filtroPrio} onChange={e=>setFiltroPrio(e.target.value)}>
                   <option>Todos</option><option>Urgente</option><option>Alta</option><option>Média</option><option>Baixa</option>
                 </select>
+                <select style={{...S.inp,width:110}} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}>
+                  <option value="Todos">Mês</option>
+                  {["01","02","03","04","05","06","07","08","09","10","11","12"].map(m=>(
+                    <option key={m} value={m}>{new Date(2000,Number(m)-1).toLocaleString("pt-BR",{month:"long"})}</option>
+                  ))}
+                </select>
+                <select style={{...S.inp,width:90}} value={filtroAno} onChange={e=>setFiltroAno(e.target.value)}>
+                  <option value="Todos">Ano</option>
+                  {Array.from(new Set(ordensFiltradas.map(o=>o.dataInicio?.substring(0,4)).filter(Boolean))).sort().reverse().map(a=>(
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
               </>}
               {isMobile && (
                 <div style={{ display:"flex", gap:6, width:"100%" }}>
@@ -1226,11 +1242,17 @@ export default function App() {
                   <select style={{...S.inp,flex:1}} value={filtroPrio} onChange={e=>setFiltroPrio(e.target.value)}>
                     <option>Todos</option><option>Urgente</option><option>Alta</option><option>Média</option><option>Baixa</option>
                   </select>
+                  <select style={{...S.inp,flex:1}} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}>
+                    <option value="Todos">Mês</option>
+                    {["01","02","03","04","05","06","07","08","09","10","11","12"].map(m=>(
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
                 </div>
               )}
               <span style={{ fontSize:10, color:C.muted }}>{filtradas.length} resultado(s)</span>
-              {(busca||filtroStatus!=="Todos"||filtroSetor!=="Todos"||filtroPrio!=="Todos")&&(
-                <button style={S.btnGhost} onClick={()=>{setBusca("");setFiltroStatus("Todos");setFiltroSetor("Todos");setFiltroPrio("Todos");}}>✕</button>
+              {(busca||filtroStatus!=="Todos"||filtroSetor!=="Todos"||filtroPrio!=="Todos"||filtroMes!=="Todos"||filtroAno!=="Todos")&&(
+                <button style={S.btnGhost} onClick={()=>{setBusca("");setFiltroStatus("Todos");setFiltroSetor("Todos");setFiltroPrio("Todos");setFiltroMes("Todos");setFiltroAno("Todos");}}>✕ Limpar</button>
               )}
               {selecionadas.size > 0 && (
                 <button style={{...S.btn(C.red,"#fff"),marginLeft:"auto"}} onClick={()=>setConfirmExcluir(true)}>
