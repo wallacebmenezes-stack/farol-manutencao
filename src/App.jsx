@@ -138,7 +138,7 @@ const hoje      = new Date();
 const diasAberta = (d) => Math.floor((hoje - new Date(d + "T00:00:00")) / 86400000);
 const fmtBRL    = (v) => (!v || v === 0) ? "—" : `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 const fmtData   = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("pt-BR") : "—";
-const totalOS   = (o) => (Number(o.valor_servico) || 0) + (Number(o.valor_pecas) || 0);
+const totalOS   = (o) => (Number(o.valorServico || o.valor_servico) || 0) + (Number(o.valorPecas || o.valor_pecas) || 0);
 const toArray   = (v) => Array.isArray(v) ? v : (v ? [v] : []);
 
 // Converte linha do banco → formato do sistema
