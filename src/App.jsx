@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
+import * as XLSX from "xlsx";
 
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL  = "https://teyxiznmkkmhqbufmuvp.supabase.co";
@@ -162,6 +163,7 @@ const fromDB = (o) => ({
   excluido:      o.excluido || false,
   excluidoEm:    o.excluido_em || null,
   excluidoPor:   o.excluido_por || null,
+  filial:        o.filial || "Farol",
 });
 
 // Converte formato do sistema → linha do banco
@@ -180,6 +182,7 @@ const toDB = (o) => ({
   data_conclusao: o.dataConclusao || null,
   obs:            o.obs || "",
   anexos:         o.anexos || [],
+  filial:         o.filial || "Farol",
 });
 
 // ─── CORES ────────────────────────────────────────────────────────────────────
@@ -300,6 +303,9 @@ export default function App() {
   const [usuario, setUsuario] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  // ── Filial ativa ──
+  const [filialAtiva, setFilialAtiva] = useState("Geral"); // "Geral" | "Farol" | "VIP"
+
   useEffect(() => {
     // Verifica sessão existente ao abrir
     sb.auth.getSession().then(({ data: { session } }) => {
@@ -376,7 +382,7 @@ export default function App() {
   const [draftCad,    setDraftCad]    = useState({});
 
   // ── Forms ──
-  const OS_VAZIO = { dataInicio: new Date().toISOString().split("T")[0], setor:"", solicitante:"", servico:"", tipoServico:"Corretiva", prioridade:"Média", tecnicos:[], valorServico:"", valorPecas:"", nf:"", obs:"", anexos:[] };
+  const OS_VAZIO = { dataInicio: new Date().toISOString().split("T")[0], setor:"", solicitante:"", servico:"", tipoServico:"Corretiva", prioridade:"Média", tecnicos:[], valorServico:"", valorPecas:"", nf:"", obs:"", anexos:[], filial: filialAtiva==="Geral"?"Farol":filialAtiva };
   const [novaOS,   setNovaOS]   = useState(OS_VAZIO);
   const [novoTec,  setNovoTec]  = useState({ nome:"", tipo:"Fornecedor", especialidade:"", telefone:"" });
   const [novoSol,  setNovoSol]  = useState({ nome:"", setor:"", cargo:"" });
@@ -393,6 +399,8 @@ export default function App() {
   const undoRef = useRef(null);
 
   // ─── CARREGAR DADOS DO BANCO ────────────────────────────────────────────────
+  const [setoresCompletos, setSetoresCompletos] = useState([]); // [{nome, filial}]
+
   const carregarTudo = useCallback(async () => {
     setLoading(true); setErro(null);
     try {
@@ -415,6 +423,7 @@ export default function App() {
       setExcluidas(oExcRes.data.map(fromDB));
       setTecnicos(tRes.data);
       setSolicitantes(sRes.data);
+      setSetoresCompletos(setRes.data); // guarda com filial
       setSetoresList(setRes.data.map(s=>s.nome));
       setTiposServico(tipRes.data);
     } catch (e) {
@@ -428,16 +437,36 @@ export default function App() {
   useEffect(() => { carregarTudo(); }, [carregarTudo]);
 
   // ─── COMPUTED ───────────────────────────────────────────────────────────────
-  const alertas        = useMemo(() => ordens.filter(o=>o.status==="Em Andamento").map(o=>({...o,dias:diasAberta(o.dataInicio)})).sort((a,b)=>b.dias-a.dias), [ordens]);
+  // Ordens filtradas pela filial ativa
+  const ordensFiltradas = useMemo(() => {
+    if (filialAtiva === "Geral") return ordens;
+    return ordens.filter(o => o.filial === filialAtiva);
+  }, [ordens, filialAtiva]);
+
+  const alertas        = useMemo(() => ordensFiltradas.filter(o=>o.status==="Em Andamento").map(o=>({...o,dias:diasAberta(o.dataInicio)})).sort((a,b)=>b.dias-a.dias), [ordensFiltradas]);
   const alertasCriticos= alertas.filter(a=>a.dias>=7);
-  const setoresOpts    = useMemo(() => ["Todos",...Array.from(new Set([...setoresList,...ordens.map(o=>o.setor)])).sort()],[setoresList,ordens]);
-  const nomeTecnicos   = useMemo(() => tecnicos.filter(t=>t.ativo).map(t=>t.nome),[tecnicos]);
-  const nomeSolicitantes=useMemo(() => solicitantes.filter(s=>s.ativo).map(s=>s.nome),[solicitantes]);
-  const nomeTipos      = useMemo(() => tiposServico.map(t=>t.nome),[tiposServico]);
-  const totalGasto     = ordens.reduce((s,o)=>s+totalOS(o),0);
+
+  // Setores filtrados pela filial ativa
+  const setoresOpts = useMemo(() => {
+    const base = filialAtiva === "Geral"
+      ? setoresCompletos.map(s=>s.nome)
+      : setoresCompletos.filter(s=>!s.filial||s.filial===filialAtiva).map(s=>s.nome);
+    return ["Todos", ...Array.from(new Set(base)).sort()];
+  }, [setoresCompletos, filialAtiva]);
+
+  // Lista de setores para o formulário de nova OS (filtra pela filial)
+  const setoresForm = useMemo(() => {
+    if (filialAtiva === "Geral") return setoresList;
+    return setoresCompletos.filter(s=>!s.filial||s.filial===filialAtiva).map(s=>s.nome);
+  }, [setoresCompletos, setoresList, filialAtiva]);
+
+  const nomeTecnicos    = useMemo(() => tecnicos.filter(t=>t.ativo).map(t=>t.nome),[tecnicos]);
+  const nomeSolicitantes= useMemo(() => solicitantes.filter(s=>s.ativo).map(s=>s.nome),[solicitantes]);
+  const nomeTipos       = useMemo(() => tiposServico.map(t=>t.nome),[tiposServico]);
+  const totalGasto      = ordensFiltradas.reduce((s,o)=>s+totalOS(o),0);
 
   const filtradas = useMemo(() => {
-    let b = ordens;
+    let b = ordensFiltradas;
     if (kpiAtivo==="andamento")  b = b.filter(o=>o.status==="Em Andamento");
     else if (kpiAtivo==="concluidas") b = b.filter(o=>o.status==="Concluido");
     else if (kpiAtivo==="alertas")    b = b.filter(o=>o.status==="Em Andamento"&&diasAberta(o.dataInicio)>=7);
@@ -448,9 +477,9 @@ export default function App() {
     return b;
   }, [ordens,kpiAtivo,filtroStatus,filtroSetor,filtroPrio,busca]);
 
-  const gastoMes = useMemo(()=>{ const m={}; ordens.forEach(o=>{const k=o.dataInicio?.substring(0,7)||""; m[k]=(m[k]||0)+totalOS(o);}); return Object.entries(m).sort(); },[ordens]);
+  const gastoMes = useMemo(()=>{ const m={}; ordensFiltradas.forEach(o=>{const k=o.dataInicio?.substring(0,7)||""; m[k]=(m[k]||0)+totalOS(o);}); return Object.entries(m).sort(); },[ordensFiltradas]);
   const maxMes   = Math.max(...gastoMes.map(([,v])=>v),1);
-  const histSetor= useMemo(()=>{ const m={}; ordens.forEach(o=>{if(!m[o.setor])m[o.setor]={qtd:0,gasto:0,abertos:0}; m[o.setor].qtd++; m[o.setor].gasto+=totalOS(o); if(o.status==="Em Andamento")m[o.setor].abertos++;}); return Object.entries(m).sort((a,b)=>b[1].gasto-a[1].gasto); },[ordens]);
+  const histSetor= useMemo(()=>{ const m={}; ordensFiltradas.forEach(o=>{if(!m[o.setor])m[o.setor]={qtd:0,gasto:0,abertos:0}; m[o.setor].qtd++; m[o.setor].gasto+=totalOS(o); if(o.status==="Em Andamento")m[o.setor].abertos++;}); return Object.entries(m).sort((a,b)=>b[1].gasto-a[1].gasto); },[ordensFiltradas]);
 
   // ─── ORDENS DE SERVIÇO ──────────────────────────────────────────────────────
   async function salvarOS() {
@@ -553,77 +582,163 @@ export default function App() {
     showToast("OS reativada!");
   }
 
-  // ─── EXPORTAR EXCEL ──────────────────────────────────────────────────────────
+  // ─── EXPORTAR EXCEL ESTILIZADO ───────────────────────────────────────────────
   function exportarExcel() {
-    // Converte array de objetos para CSV com BOM UTF-8 (abre certo no Excel)
-    function toCSV(dados, colunas) {
-      const header = colunas.map(c => c.label).join(";");
-      const rows = dados.map(d =>
-        colunas.map(c => {
-          const val = c.fn ? c.fn(d) : (d[c.key] ?? "");
-          const str = String(val).replace(/"/g, '""');
-          return `"${str}"`;
-        }).join(";")
-      );
-      return "\uFEFF" + [header, ...rows].join("\n");
+    const agora = new Date().toLocaleDateString("pt-BR").replace(/\//g,"-");
+    const wb = XLSX.utils.book_new();
+
+    // ── Estilos reutilizáveis ──
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
+      fill: { fgColor: { rgb: "1A2F3F" } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: { bottom: { style: "medium", color: { rgb: "F5A623" } } },
+    };
+    const rowEvenStyle = { fill: { fgColor: { rgb: "0E1318" } }, font: { sz: 10 } };
+    const rowOddStyle  = { fill: { fgColor: { rgb: "131920" } }, font: { sz: 10 } };
+    const accentStyle  = { font: { bold: true, color: { rgb: "F5A623" }, sz: 10 } };
+    const greenStyle   = { font: { color: { rgb: "2ECC71" }, sz: 10 } };
+    const yellowStyle  = { font: { color: { rgb: "F39C12" }, sz: 10 } };
+    const redStyle     = { font: { color: { rgb: "E74C3C" }, sz: 10 } };
+    const mutedStyle   = { font: { color: { rgb: "8AA0B0" }, sz: 10 } };
+    const moneyStyle   = { font: { color: { rgb: "F5A623" }, bold: true, sz: 10 }, numFmt: 'R$ #,##0.00' };
+
+    function statusStyle(s) {
+      if (s === "Concluido")    return greenStyle;
+      if (s === "Em Andamento") return yellowStyle;
+      return mutedStyle;
+    }
+    function prioStyle(p) {
+      if (p === "Urgente") return redStyle;
+      if (p === "Alta")    return { font: { color: { rgb: "E67E22" }, sz: 10 } };
+      return mutedStyle;
     }
 
-    const agora = new Date().toLocaleDateString("pt-BR").replace(/\//g,"-");
+    // ── ABA 1: Ordens de Serviço ──
+    const osHeaders = ["#","Data Início","Setor","Solicitante","Serviço","Tipo","Prioridade","Status","Técnico(s)","Valor Serviço","Valor Peças","Total","NF/OS","Data Conclusão","Observações","Anexos"];
+    const osRows = [...ordens, ...excluidas].map(o => [
+      String(o.id).padStart(3,"0"),
+      fmtData(o.dataInicio),
+      o.setor,
+      o.solicitante,
+      o.servico,
+      o.tipoServico,
+      o.prioridade,
+      o.status,
+      toArray(o.tecnicos).join(" + "),
+      Number(o.valorServico||0),
+      Number(o.valorPecas||0),
+      totalOS(o),
+      o.nf||"",
+      fmtData(o.dataConclusao),
+      o.obs||"",
+      (o.anexos||[]).length,
+    ]);
 
-    // ── Planilha 1: Ordens de Serviço ──
-    const colOS = [
-      { label:"ID",             key:"id" },
-      { label:"Data Início",    fn: o => fmtData(o.dataInicio) },
-      { label:"Setor",          key:"setor" },
-      { label:"Solicitante",    key:"solicitante" },
-      { label:"Serviço",        key:"servico" },
-      { label:"Tipo",           key:"tipoServico" },
-      { label:"Prioridade",     key:"prioridade" },
-      { label:"Status",         key:"status" },
-      { label:"Técnico(s)",     fn: o => toArray(o.tecnicos).join(" + ") },
-      { label:"Valor Serviço",  fn: o => Number(o.valorServico||0).toFixed(2).replace(".",",") },
-      { label:"Valor Peças",    fn: o => Number(o.valorPecas||0).toFixed(2).replace(".",",") },
-      { label:"Total",          fn: o => totalOS(o).toFixed(2).replace(".",",") },
-      { label:"NF/OS",          key:"nf" },
-      { label:"Data Conclusão", fn: o => fmtData(o.dataConclusao) },
-      { label:"Observações",    key:"obs" },
-      { label:"Qtd Anexos",     fn: o => (o.anexos||[]).length },
-    ];
+    const wsOS = XLSX.utils.aoa_to_sheet([osHeaders, ...osRows]);
 
-    // ── Planilha 2: Técnicos ──
-    const colTec = [
-      { label:"Nome",        key:"nome" },
-      { label:"Tipo",        key:"tipo" },
-      { label:"Especialidade",key:"especialidade" },
-      { label:"Telefone",    key:"telefone" },
-      { label:"Status",      fn: t => t.ativo ? "Ativo" : "Inativo" },
-    ];
-
-    // ── Planilha 3: Solicitantes ──
-    const colSol = [
-      { label:"Nome",  key:"nome" },
-      { label:"Setor", key:"setor" },
-      { label:"Cargo", key:"cargo" },
-      { label:"Status",fn: s => s.ativo ? "Ativo" : "Inativo" },
-    ];
-
-    // Gera e baixa cada CSV
-    const arquivos = [
-      { nome:`farol-ordens-${agora}.csv`,      csv: toCSV([...ordens,...excluidas], colOS) },
-      { nome:`farol-tecnicos-${agora}.csv`,     csv: toCSV(tecnicos, colTec) },
-      { nome:`farol-solicitantes-${agora}.csv`, csv: toCSV(solicitantes, colSol) },
-    ];
-
-    arquivos.forEach(({ nome, csv }) => {
-      const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href = url; a.download = nome;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a); URL.revokeObjectURL(url);
+    // Aplica estilos célula a célula
+    osRows.forEach((row, ri) => {
+      const baseStyle = ri % 2 === 0 ? rowEvenStyle : rowOddStyle;
+      osHeaders.forEach((_, ci) => {
+        const addr = XLSX.utils.encode_cell({ r: ri+1, c: ci });
+        if (!wsOS[addr]) return;
+        let style = { ...baseStyle };
+        if (ci === 0)  style = { ...style, ...accentStyle };
+        if (ci === 7)  style = { ...style, ...statusStyle(row[7]) };
+        if (ci === 6)  style = { ...style, ...prioStyle(row[6]) };
+        if (ci >= 9 && ci <= 11) style = { ...style, ...moneyStyle };
+        wsOS[addr].s = style;
+      });
     });
 
-    showToast("3 arquivos exportados — verifique seus downloads!");
+    // Cabeçalho
+    osHeaders.forEach((_, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: ci });
+      if (wsOS[addr]) wsOS[addr].s = headerStyle;
+    });
+
+    // Larguras das colunas
+    wsOS["!cols"] = [
+      {wch:6},{wch:12},{wch:18},{wch:14},{wch:45},{wch:12},{wch:10},{wch:14},
+      {wch:22},{wch:14},{wch:14},{wch:12},{wch:10},{wch:14},{wch:35},{wch:8}
+    ];
+    wsOS["!autofilter"] = { ref: `A1:P1` };
+    wsOS["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    XLSX.utils.book_append_sheet(wb, wsOS, "Ordens de Serviço");
+
+    // ── ABA 2: Técnicos ──
+    const tecHeaders = ["Nome","Tipo","Especialidade","Telefone","Status","OS Realizadas"];
+    const tecRows = tecnicos.map(t => [
+      t.nome, t.tipo, t.especialidade||"", t.telefone||"",
+      t.ativo?"Ativo":"Inativo",
+      ordens.filter(o=>toArray(o.tecnicos).some(n=>n.toLowerCase().includes(t.nome.toLowerCase().split(" ")[0]))).length
+    ]);
+    const wsTec = XLSX.utils.aoa_to_sheet([tecHeaders, ...tecRows]);
+    tecHeaders.forEach((_,ci) => { const a=XLSX.utils.encode_cell({r:0,c:ci}); if(wsTec[a]) wsTec[a].s=headerStyle; });
+    tecRows.forEach((row,ri) => {
+      const base = ri%2===0?rowEvenStyle:rowOddStyle;
+      tecHeaders.forEach((_,ci) => {
+        const a=XLSX.utils.encode_cell({r:ri+1,c:ci}); if(!wsTec[a]) return;
+        let s={...base};
+        if(ci===4) s={...s,...(row[4]==="Ativo"?greenStyle:mutedStyle)};
+        if(ci===5) s={...s,...accentStyle};
+        wsTec[a].s=s;
+      });
+    });
+    wsTec["!cols"]=[{wch:24},{wch:12},{wch:20},{wch:16},{wch:10},{wch:14}];
+    wsTec["!autofilter"]={ ref:"A1:F1" };
+    XLSX.utils.book_append_sheet(wb, wsTec, "Técnicos");
+
+    // ── ABA 3: Solicitantes ──
+    const solHeaders = ["Nome","Setor","Cargo","Status","OS Abertas"];
+    const solRows = solicitantes.map(s => [
+      s.nome, s.setor||"", s.cargo||"",
+      s.ativo?"Ativo":"Inativo",
+      ordens.filter(o=>o.solicitante?.toLowerCase()===s.nome?.toLowerCase()).length
+    ]);
+    const wsSol = XLSX.utils.aoa_to_sheet([solHeaders, ...solRows]);
+    solHeaders.forEach((_,ci) => { const a=XLSX.utils.encode_cell({r:0,c:ci}); if(wsSol[a]) wsSol[a].s=headerStyle; });
+    solRows.forEach((row,ri) => {
+      const base=ri%2===0?rowEvenStyle:rowOddStyle;
+      solHeaders.forEach((_,ci) => {
+        const a=XLSX.utils.encode_cell({r:ri+1,c:ci}); if(!wsSol[a]) return;
+        let s={...base};
+        if(ci===3) s={...s,...(row[3]==="Ativo"?greenStyle:mutedStyle)};
+        if(ci===4) s={...s,...accentStyle};
+        wsSol[a].s=s;
+      });
+    });
+    wsSol["!cols"]=[{wch:20},{wch:18},{wch:20},{wch:10},{wch:12}];
+    wsSol["!autofilter"]={ ref:"A1:E1" };
+    XLSX.utils.book_append_sheet(wb, wsSol, "Solicitantes");
+
+    // ── ABA 4: Resumo por Setor ──
+    const setorHeaders = ["Setor","Qtd OS","Em Aberto","Concluídas","Gasto Total","Mão de Obra","Peças"];
+    const setorRows = Object.entries(
+      ordens.reduce((m,o)=>{ if(!m[o.setor])m[o.setor]={qtd:0,abertos:0,concluidos:0,gasto:0,mo:0,pc:0}; m[o.setor].qtd++; m[o.setor].gasto+=totalOS(o); m[o.setor].mo+=Number(o.valorServico||0); m[o.setor].pc+=Number(o.valorPecas||0); if(o.status==="Em Andamento")m[o.setor].abertos++; else m[o.setor].concluidos++; return m; },{})
+    ).sort((a,b)=>b[1].gasto-a[1].gasto).map(([s,d])=>[s,d.qtd,d.abertos,d.concluidos,d.gasto,d.mo,d.pc]);
+
+    const wsSetor = XLSX.utils.aoa_to_sheet([setorHeaders, ...setorRows]);
+    setorHeaders.forEach((_,ci) => { const a=XLSX.utils.encode_cell({r:0,c:ci}); if(wsSetor[a]) wsSetor[a].s=headerStyle; });
+    setorRows.forEach((row,ri) => {
+      const base=ri%2===0?rowEvenStyle:rowOddStyle;
+      setorHeaders.forEach((_,ci) => {
+        const a=XLSX.utils.encode_cell({r:ri+1,c:ci}); if(!wsSetor[a]) return;
+        let s={...base};
+        if(ci===0) s={...s,font:{...base.font,bold:true}};
+        if(ci===2) s={...s,...(row[2]>0?yellowStyle:greenStyle)};
+        if(ci>=4)  s={...s,...moneyStyle};
+        wsSetor[a].s=s;
+      });
+    });
+    wsSetor["!cols"]=[{wch:20},{wch:10},{wch:12},{wch:12},{wch:16},{wch:14},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsSetor, "Por Setor");
+
+    // Gera e baixa
+    XLSX.writeFile(wb, `farol-backup-${agora}.xlsx`, { bookType:"xlsx", type:"binary", cellStyles:true });
+    showToast("Excel exportado com sucesso!");
   }
   async function lerArquivos(files, osId) {
     Array.from(files).forEach(file => {
@@ -882,8 +997,8 @@ export default function App() {
             </div>
           )}
           <div style={{ padding:"10px 14px", borderTop:`1px solid ${C.border}`, marginTop:alertasCriticos.length?0:"auto" }}>
-            <div style={{ fontSize:9, color:C.muted }}>TOTAL OS</div>
-            <div style={{ fontSize:22, fontWeight:900, color:C.accent }}>{ordens.length}</div>
+            <div style={{ fontSize:9, color:C.muted }}>TOTAL OS {filialAtiva!=="Geral"?`(${filialAtiva})`:""}</div>
+            <div style={{ fontSize:22, fontWeight:900, color:C.accent }}>{ordensFiltradas.length}</div>
           </div>
         </div>
       )}
@@ -938,9 +1053,17 @@ export default function App() {
         {/* Topbar Mobile */}
         {isMobile ? (
           <div style={S.topbarMobile}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <button onClick={()=>setMenuAberto(true)} style={{ background:"transparent", border:"none", color:C.accent, fontSize:22, cursor:"pointer", padding:"2px 4px" }}>☰</button>
-              <div style={{ fontSize:12, fontWeight:800, color:C.accent }}>⚙ FAROL</div>
+              {/* Filial tabs mobile */}
+              <div style={{ display:"flex", background:C.card, border:`1px solid ${C.border}`, borderRadius:6, overflow:"hidden" }}>
+                {["Geral","Farol","VIP"].map(f=>(
+                  <button key={f} onClick={()=>setFilialAtiva(f)}
+                    style={{ background: filialAtiva===f ? C.accent : "transparent", color: filialAtiva===f ? "#000" : C.muted, border:"none", padding:"5px 10px", fontSize:10, fontWeight:700, cursor:"pointer" }}>
+                    {f}
+                  </button>
+                ))}
+              </div>
               {alertasCriticos.length>0&&<span style={{ background:C.red+"33", color:C.red, borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800 }}>⚠{alertasCriticos.length}</span>}
             </div>
             <div style={{ display:"flex", gap:8, alignItems:"center" }}>
@@ -958,6 +1081,16 @@ export default function App() {
               {kpiAtivo&&aba==="ordens"&&<button style={{...S.btnGhost,padding:"3px 8px",fontSize:9}} onClick={()=>setKpiAtivo(null)}>✕ limpar filtro</button>}
             </div>
             <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              {/* Seletor de filial */}
+              <div style={{ display:"flex", background:C.card, border:`1px solid ${C.border}`, borderRadius:7, overflow:"hidden" }}>
+                {["Geral","Farol","VIP"].map(f=>(
+                  <button key={f} onClick={()=>setFilialAtiva(f)}
+                    style={{ background: filialAtiva===f ? C.accent : "transparent", color: filialAtiva===f ? "#000" : C.muted, border:"none", padding:"5px 14px", fontSize:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.06em", transition:"all 0.15s" }}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <div style={{ width:1, height:20, background:C.border }}/>
               <span style={{ fontSize:10, color:C.muted }}>{new Date().toLocaleDateString("pt-BR")}</span>
               <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={carregarTudo} title="Recarregar dados">⟳</button>
               <button style={{ background:"#1D6F42", color:"#fff", border:"none", borderRadius:6, padding:"6px 14px", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6, whiteSpace:"nowrap" }} onClick={exportarExcel} title="Exportar backup Excel">
@@ -990,9 +1123,9 @@ export default function App() {
           {/* ══ DASHBOARD ══ */}
           {aba==="dashboard"&&(<>
             <div style={S.g4}>
-              <KPICard label="Total de OS"  value={ordens.length}                                    color={C.blue}   onClick={()=>{if(kpiAtivo==="total"){setKpiAtivo(null);}else{setKpiAtivo("total");}setAba("ordens");}} active={kpiAtivo==="total"} />
-              <KPICard label="Em Andamento" value={ordens.filter(o=>o.status==="Em Andamento").length} color={C.yellow} onClick={()=>{if(kpiAtivo==="andamento"){setKpiAtivo(null);}else{setKpiAtivo("andamento");}setAba("ordens");}} active={kpiAtivo==="andamento"} />
-              <KPICard label="Concluídas"   value={ordens.filter(o=>o.status==="Concluido").length}  color={C.green}  onClick={()=>{if(kpiAtivo==="concluidas"){setKpiAtivo(null);}else{setKpiAtivo("concluidas");}setAba("ordens");}} active={kpiAtivo==="concluidas"} />
+              <KPICard label="Total de OS"  value={ordensFiltradas.length}                                    color={C.blue}   onClick={()=>{if(kpiAtivo==="total"){setKpiAtivo(null);}else{setKpiAtivo("total");}setAba("ordens");}} active={kpiAtivo==="total"} />
+              <KPICard label="Em Andamento" value={ordensFiltradas.filter(o=>o.status==="Em Andamento").length} color={C.yellow} onClick={()=>{if(kpiAtivo==="andamento"){setKpiAtivo(null);}else{setKpiAtivo("andamento");}setAba("ordens");}} active={kpiAtivo==="andamento"} />
+              <KPICard label="Concluídas"   value={ordensFiltradas.filter(o=>o.status==="Concluido").length}  color={C.green}  onClick={()=>{if(kpiAtivo==="concluidas"){setKpiAtivo(null);}else{setKpiAtivo("concluidas");}setAba("ordens");}} active={kpiAtivo==="concluidas"} />
               <KPICard label="OS c/ Alerta" value={alertasCriticos.length} color={alertasCriticos.length>0?C.red:C.muted} onClick={()=>{if(kpiAtivo==="alertas"){setKpiAtivo(null);}else{setKpiAtivo("alertas");}setAba("ordens");}} active={kpiAtivo==="alertas"} />
             </div>
             <div style={S.g2}>
@@ -1189,8 +1322,8 @@ export default function App() {
                 <tbody>
                   {histSetor.map(([setor,d])=>{
                     const pct=((d.gasto/totalGasto)*100||0).toFixed(1);
-                    const mo=ordens.filter(o=>o.setor===setor).reduce((s,o)=>s+(Number(o.valorServico)||0),0);
-                    const pc=ordens.filter(o=>o.setor===setor).reduce((s,o)=>s+(Number(o.valorPecas)||0),0);
+                    const mo=ordensFiltradas.filter(o=>o.setor===setor).reduce((s,o)=>s+(Number(o.valorServico)||0),0);
+                    const pc=ordensFiltradas.filter(o=>o.setor===setor).reduce((s,o)=>s+(Number(o.valorPecas)||0),0);
                     return (
                       <tr key={setor} onClick={()=>{setFiltroSetor(setor);setAba("ordens");}} style={{ cursor:"pointer" }}
                         onMouseEnter={e=>e.currentTarget.style.background="#ffffff05"}
@@ -1216,9 +1349,9 @@ export default function App() {
             <div style={S.g4}>
               {[
                 {label:"Total geral",     value:fmtBRL(totalGasto),color:C.accent},
-                {label:"Mão de obra",     value:fmtBRL(ordens.reduce((s,o)=>s+(Number(o.valorServico)||0),0)),color:C.blue},
-                {label:"Peças / material",value:fmtBRL(ordens.reduce((s,o)=>s+(Number(o.valorPecas)||0),0)),color:C.cyan},
-                {label:"OS com custo",    value:ordens.filter(o=>totalOS(o)>0).length,color:C.green},
+                {label:"Mão de obra",     value:fmtBRL(ordensFiltradas.reduce((s,o)=>s+(Number(o.valorServico)||0),0)),color:C.blue},
+                {label:"Peças / material",value:fmtBRL(ordensFiltradas.reduce((s,o)=>s+(Number(o.valorPecas)||0),0)),color:C.cyan},
+                {label:"OS com custo",    value:ordensFiltradas.filter(o=>totalOS(o)>0).length,color:C.green},
               ].map(k=><KPICard key={k.label} {...k}/>)}
             </div>
             <div style={S.card}>
@@ -1226,7 +1359,7 @@ export default function App() {
               <table style={S.table}>
                 <thead><tr>{["#","Setor","Serviço","Técnico(s)","NF","Serviço R$","Peças R$","Total"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {ordens.filter(o=>totalOS(o)>0).sort((a,b)=>totalOS(b)-totalOS(a)).map(o=>(
+                  {ordensFiltradas.filter(o=>totalOS(o)>0).sort((a,b)=>totalOS(b)-totalOS(a)).map(o=>(
                     <tr key={o.id} onClick={()=>setDetalhe(o)} style={{ cursor:"pointer" }}
                       onMouseEnter={e=>e.currentTarget.style.background="#ffffff05"}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
@@ -1483,14 +1616,22 @@ export default function App() {
               const set=(k,v)=>editOS?setEditOS({...editOS,[k]:v}):setNovaOS({...novaOS,[k]:v});
               return (<>
                 <div style={S.r2}>
+                  <div style={S.fr}><label style={S.label}>Filial</label>
+                    <select style={S.inp} value={d.filial||"Farol"} onChange={e=>set("filial",e.target.value)}>
+                      <option value="Farol">Farol</option>
+                      <option value="VIP">VIP</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={S.r2}>
                   <div style={S.fr}><label style={S.label}>Setor</label>
                     {isMobile
                       ? <select style={S.inp} value={d.setor} onChange={e=>set("setor",e.target.value)}>
                           <option value="">Selecione o setor...</option>
-                          {setoresList.map(s=><option key={s} value={s}>{s}</option>)}
+                          {(d.filial==="VIP" ? setoresCompletos.filter(s=>s.filial==="VIP") : setoresCompletos.filter(s=>!s.filial||s.filial==="Farol")).map(s=><option key={s.id||s.nome} value={s.nome}>{s.nome}</option>)}
                         </select>
                       : <><input style={S.inp} list="s-list" value={d.setor} onChange={e=>set("setor",e.target.value)} placeholder="Selecione ou digite..."/>
-                          <datalist id="s-list">{setoresList.map(s=><option key={s} value={s}/>)}</datalist></>
+                          <datalist id="s-list">{(d.filial==="VIP" ? setoresCompletos.filter(s=>s.filial==="VIP") : setoresCompletos.filter(s=>!s.filial||s.filial==="Farol")).map(s=><option key={s.id||s.nome} value={s.nome}/>)}</datalist></>
                     }
                   </div>
                   <div style={S.fr}><label style={S.label}>Solicitante</label>
