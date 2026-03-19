@@ -883,7 +883,16 @@ export default function App() {
           <div style={{ display:"flex", gap:8, alignItems:"center" }}>
             <span style={{ fontSize:10, color:C.muted }}>{new Date().toLocaleDateString("pt-BR")}</span>
             <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={carregarTudo} title="Recarregar dados">⟳</button>
-            <button style={{...S.btnGhost,padding:"4px 10px",fontSize:9}} onClick={exportarExcel} title="Exportar backup Excel">⬇ Excel</button>
+            <button style={{ background:"#1D6F42", color:"#fff", border:"none", borderRadius:6, padding:"6px 14px", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6, whiteSpace:"nowrap" }} onClick={exportarExcel} title="Exportar backup Excel">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#fff" fillOpacity="0.2" stroke="#fff" strokeWidth="1.5"/>
+                <path d="M14 2V8H20" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M8 13L10.5 17L8 21" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M16 13L13.5 17L16 21" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10.5 17H13.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              Exportar Excel
+            </button>
             {aba==="ordens"&&<button style={S.btn()} onClick={()=>{setEditOS(null);setModalOS(true);}}>+ Nova OS</button>}
             <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:8, paddingLeft:8, borderLeft:`1px solid ${C.border}` }}>
               <div style={{ textAlign:"right" }}>
