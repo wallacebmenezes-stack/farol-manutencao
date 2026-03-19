@@ -306,6 +306,15 @@ export default function App() {
   // ── Filial ativa ──
   const [filialAtiva, setFilialAtiva] = useState("Geral"); // "Geral" | "Farol" | "VIP"
 
+  // ── Mobile ──
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [menuAberto, setMenuAberto] = useState(false);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
   useEffect(() => {
     // Verifica sessão existente ao abrir
     sb.auth.getSession().then(({ data: { session } }) => {
@@ -859,15 +868,6 @@ export default function App() {
     if (error) { showToast("Erro","erro"); return; }
     setTiposServico(prev=>prev.filter(t=>t.id!==id));
   }
-
-  // ─── MOBILE ───────────────────────────────────────────────────────────────
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [menuAberto, setMenuAberto] = useState(false);
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
 
   // ─── ESTILOS ──────────────────────────────────────────────────────────────
   const S = {
