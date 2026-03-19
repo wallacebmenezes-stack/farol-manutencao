@@ -1484,12 +1484,24 @@ export default function App() {
               return (<>
                 <div style={S.r2}>
                   <div style={S.fr}><label style={S.label}>Setor</label>
-                    <input style={S.inp} list="s-list" value={d.setor} onChange={e=>set("setor",e.target.value)}/>
-                    <datalist id="s-list">{setoresList.map(s=><option key={s} value={s}/>)}</datalist>
+                    {isMobile
+                      ? <select style={S.inp} value={d.setor} onChange={e=>set("setor",e.target.value)}>
+                          <option value="">Selecione o setor...</option>
+                          {setoresList.map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      : <><input style={S.inp} list="s-list" value={d.setor} onChange={e=>set("setor",e.target.value)} placeholder="Selecione ou digite..."/>
+                          <datalist id="s-list">{setoresList.map(s=><option key={s} value={s}/>)}</datalist></>
+                    }
                   </div>
                   <div style={S.fr}><label style={S.label}>Solicitante</label>
-                    <input style={S.inp} list="sol-list" value={d.solicitante} onChange={e=>set("solicitante",e.target.value)}/>
-                    <datalist id="sol-list">{nomeSolicitantes.map(n=><option key={n} value={n}/>)}</datalist>
+                    {isMobile
+                      ? <select style={S.inp} value={d.solicitante} onChange={e=>set("solicitante",e.target.value)}>
+                          <option value="">Selecione o solicitante...</option>
+                          {nomeSolicitantes.map(n=><option key={n} value={n}>{n}</option>)}
+                        </select>
+                      : <><input style={S.inp} list="sol-list" value={d.solicitante} onChange={e=>set("solicitante",e.target.value)} placeholder="Selecione ou digite..."/>
+                          <datalist id="sol-list">{nomeSolicitantes.map(n=><option key={n} value={n}/>)}</datalist></>
+                    }
                   </div>
                 </div>
                 <div style={S.fr}><label style={S.label}>Descrição do Serviço</label>
@@ -1512,7 +1524,13 @@ export default function App() {
                 </div>
                 <div style={S.fr}>
                   <label style={S.label}>Técnico(s) / Fornecedor(es)</label>
-                  <TecnicosSelector value={toArray(d.tecnicos)} onChange={arr=>set("tecnicos",arr)} opcoes={nomeTecnicos}/>
+                  {isMobile
+                    ? <select style={S.inp} value={toArray(d.tecnicos)[0]||""} onChange={e=>set("tecnicos", e.target.value ? [e.target.value] : [])}>
+                        <option value="">Selecione o técnico...</option>
+                        {nomeTecnicos.map(n=><option key={n} value={n}>{n}</option>)}
+                      </select>
+                    : <TecnicosSelector value={toArray(d.tecnicos)} onChange={arr=>set("tecnicos",arr)} opcoes={nomeTecnicos}/>
+                  }
                 </div>
                 <div style={S.r2}>
                   <div style={S.fr}><label style={S.label}>NF / Nº OS</label><input style={S.inp} value={d.nf} onChange={e=>set("nf",e.target.value)}/></div>
